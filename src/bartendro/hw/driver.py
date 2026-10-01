@@ -269,37 +269,46 @@ class Driver:
                 timeout: float = 120.0) -> None:
         """Pour {dispenser index: ml} at the same time and wait until all pumps stop.
         Same logic as mixer._dispense_recipe: amounts under 20 ml go at half speed."""
-        active = []
         for i, ml in amounts.items():
-            if not ml:
-                continue
-            if not 0 < ml <= MAX_DISPENSE_ML:
+            if ml and not 0 < ml <= MAX_DISPENSE_ML:
                 raise DriverError(f"refusing to pour {ml} ml (limit {MAX_DISPENSE_ML})")
-            ticks = int(ml * TICKS_PER_ML)
-            speed = HALF_SPEED if ml < SLOW_DISPENSE_THRESHOLD and not always_fast else FULL_SPEED
-            self.set_motor_direction(i, p.MOTOR_DIRECTION_FORWARD)
-            if not self.dispense_ticks(i, ticks, speed):
-                raise DriverError(f"dispense of {ticks} ticks at speed {speed} on dispenser #{i + 1} failed")
-            active.append(i)
-            time.sleep(0.01)
 
-        deadline = time.monotonic() + timeout
-        for i in active:
-            while True:
-                if time.monotonic() > deadline:
-                    for j in active:
-                        self.stop(j)
-                    raise DriverError("pour did not finish in time; pumps stopped")
-                dispensing, over_current = self.is_dispensing(i)
-                if dispensing < 0 or over_current < 0:
-                    log.warning("is_dispensing on #%d failed (motor noise?), retrying", i + 1)
-                    time.sleep(0.2)
+        active: list[int] = []
+        stalled = None
+        try:
+            for i, ml in amounts.items():
+                if not ml:
                     continue
-                if over_current:
-                    raise OverCurrentError(f"pump #{i + 1} stalled (over current)")
-                if dispensing == 0:
-                    break
-                time.sleep(poll)
+                ticks = int(ml * TICKS_PER_ML)
+                speed = HALF_SPEED if ml < SLOW_DISPENSE_THRESHOLD and not always_fast else FULL_SPEED
+                active.append(i)  # before sending: the command may arrive even if its ACK is lost
+                self.set_motor_direction(i, p.MOTOR_DIRECTION_FORWARD)
+                if not self.dispense_ticks(i, ticks, speed):
+                    raise DriverError(f"dispense of {ticks} ticks at speed {speed} on dispenser #{i + 1} failed")
+                time.sleep(0.01)
+
+            deadline = time.monotonic() + timeout
+            for i in active:
+                while True:
+                    if time.monotonic() > deadline:
+                        raise DriverError("pour did not finish in time; pumps stopped")
+                    dispensing, over_current = self.is_dispensing(i)
+                    if dispensing < 0 or over_current < 0:
+                        log.warning("is_dispensing on #%d failed (motor noise?), retrying", i + 1)
+                        time.sleep(0.2)
+                        continue
+                    if over_current:
+                        stalled = i
+                        raise OverCurrentError(f"pump #{i + 1} stalled (over current); other pumps stopped")
+                    if dispensing == 0:
+                        break
+                    time.sleep(poll)
+        except BaseException:
+            # Changed from mixer._dispense_recipe, which left the other pumps running when one
+            # stalled or a dispense command failed. Stop every pump we started; the stalled one
+            # has already stopped itself and ignores commands until reset.
+            self._stop_quietly(j for j in active if j != stalled)
+            raise
 
     # ---------------------------------------------------------------- private
 
@@ -308,6 +317,15 @@ class Driver:
             return self.dispensers[i].id
         except IndexError:
             raise DriverError(f"no dispenser #{i + 1} (found {self.count()})") from None
+
+    def _stop_quietly(self, indexes) -> None:
+        """Stop pumps during error handling without hiding the original error."""
+        for j in indexes:
+            try:
+                if not self.stop(j):
+                    log.error("could not stop pump #%d", j + 1)
+            except Exception:
+                log.exception("could not stop pump #%d", j + 1)
 
     def _broadcast(self, body: bytes) -> bool:
         self.ser.reset_input_buffer()

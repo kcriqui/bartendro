@@ -2,7 +2,7 @@ import pytest
 
 from bartendro.cli import main
 from bartendro.hw import protocol as p
-from bartendro.hw.driver import TICKS_PER_ML, Driver, OverCurrentError
+from bartendro.hw.driver import TICKS_PER_ML, Driver, DriverError, OverCurrentError
 from bartendro.hw.simulator import SimBus, SimDispenser
 
 
@@ -63,6 +63,36 @@ def test_over_current_raises():
     bus.ports[0].over_current = True
     with pytest.raises(OverCurrentError):
         d.pour_ml({0: 30})
+
+
+def test_stall_stops_the_other_pumps(monkeypatch):
+    monkeypatch.setattr(SimBus, "time_scale", 1.0)  # keep the long pour running
+    bus = SimBus.with_dispensers(3)
+    d = make(bus)
+    bus.ports[0].over_current = True
+    with pytest.raises(OverCurrentError):
+        d.pour_ml({0: 30, 1: 500, 2: 500})
+    assert not any(x.dispensing for x in bus.ports.values())
+
+
+def test_timeout_stops_all_pumps(monkeypatch):
+    monkeypatch.setattr(SimBus, "time_scale", 1.0)
+    bus = SimBus.with_dispensers(2)
+    d = make(bus)
+    with pytest.raises(DriverError, match="did not finish"):
+        d.pour_ml({0: 500, 1: 500}, timeout=0)
+    assert not any(x.dispensing for x in bus.ports.values())
+
+
+def test_failed_start_stops_pumps_already_running(monkeypatch):
+    monkeypatch.setattr(SimBus, "time_scale", 1.0)
+    bus = SimBus.with_dispensers(2)
+    d = make(bus)
+    real = d.dispense_ticks
+    monkeypatch.setattr(d, "dispense_ticks", lambda i, *a: False if i == 1 else real(i, *a))
+    with pytest.raises(DriverError, match="dispenser #2 failed"):
+        d.pour_ml({0: 500, 1: 500})
+    assert not bus.ports[0].dispensing
 
 
 def test_liquid_levels_and_thresholds():
