@@ -30,12 +30,15 @@ Raspberry Pi OS Bookworm. It keeps the existing router board, dispensers and fir
 src/bartendro/hw -- serial protocol, router board (I2C), status LED, dispenser driver,
                     and a simulator that speaks the real protocol (replaces "software only")
 src/bartendro/cli.py -- `bartendro-hw`: discover, flash LEDs, pour, run, level, info
+src/bartendro/db -- SQLite database (SQLAlchemy + Alembic migrations), importer for old
+                    bartendro.db files; `bartendro-db`: upgrade, import, show, set-password
+src/bartendro/config.py -- per-bot settings file (docs/bartendro.example.toml)
 tests            -- pytest suite, runs against the simulator (no hardware needed)
 docs/pi-setup.md -- Pi setup (UART, I2C, install) and the first hardware test
 
-Done so far: milestone 1 (hardware layer + command-line test tool). Next: database
-with migrations and an importer for old `bartendro.db` files, then the web interface,
-then a cocktail recipe database. `ui/` stays until the new code pours correctly on real bots.
+Done so far: milestone 1 (hardware layer + command-line test tool) and milestone 2 (database,
+importer for old `bartendro.db` files, per-bot config). Next: the web interface, then a cocktail
+recipe database. `ui/` stays until the new code pours correctly on real bots.
 
     pip install -e ".[dev]" && pytest
     bartendro-hw --sim 15 discover

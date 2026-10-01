@@ -16,7 +16,9 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 1. **Hardware layer + `bartendro-hw` CLI** - code done 2026-10-01, tested only in the simulator
    and against the firmware's pack7.c (500 packets identical). **Next step: run it on a real
    bot** (docs/pi-setup.md, "What to check on real hardware") and fix what turns up.
-2. Database: SQLAlchemy 2 + Alembic on SQLite; importer for old `bartendro.db` files.
+2. **Database** - done 2026-10-01: SQLAlchemy 2 + Alembic on SQLite, importer for old
+   `bartendro.db` files (checked against `ui/bartendro.db.default`), per-bot TOML config,
+   `bartendro-db` CLI. Still to do: import Kevin's real `bartendro.db` files from the bots' SD cards.
 3. Web app: FastAPI (or Flask 3) + htmx, phone-first (small bots have no screen), WebSocket
    pour status; port the state machine `ui/bartendro/fsm.py` + `mixer.py` logic.
 4. Cocktail recipe database: ingredients separate from brands, pumpable vs. manual steps,
@@ -31,6 +33,13 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
   board pins 18/16/22), `hw/driver.py` (port of `ui/bartendro/router/driver.py` + the pour loop
   of `mixer._dispense_recipe`), `hw/simulator.py` (fake router + dispensers speaking the real
   protocol), `hw/connect.py` (open hardware or simulator).
+- `db/models.py` (tables), `db/migrations/` (Alembic, no alembic.ini; run via `db.upgrade()`),
+  `db/importer.py` (old bartendro.db -> new, read-only, keeps ids), `db/options.py` (typed
+  settings, password hashed), `db/menu.py` (what can be made; parts -> ml with strength/tartness).
+  Recipes are in parts, scaled to the glass size at pour time, like the old app.
+- `config.py` - per-bot TOML (`docs/bartendro.example.toml`): ports, dispensers, db path, screen.
+- Schema change: edit models.py, then `bartendro-db --db scratch.db revision -m "..."`, review
+  the generated file; `tests/test_db.py::test_migrations_match_models` fails until you do.
 - Port old logic faithfully; when changing behaviour, note it in a comment (e.g. discovery
   retries are now bounded).
 

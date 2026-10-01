@@ -54,6 +54,27 @@ python3 -m venv --system-site-packages .venv   # system packages = gpiozero/lgpi
 (useful on a PC). The old Python 2 server (`ui/`) must not run at the same time - it holds
 the serial port.
 
+## 5. Bot config and database
+
+```
+sudo mkdir -p /etc/bartendro /var/lib/bartendro && sudo chown $USER /var/lib/bartendro
+sudo cp docs/bartendro.example.toml /etc/bartendro/bartendro.toml   # then edit: name, ports, ...
+.venv/bin/bartendro-db upgrade          # creates /var/lib/bartendro/bartendro.db
+```
+
+To keep the drinks and dispenser setup from an old bot, copy its `bartendro.db` off the old SD
+card. It's in the `ui/` folder of the old checkout (e.g. `/home/<user>/bartendro/ui/bartendro.db`;
+the old start script used `/home/robert/bartendro/ui`). Then:
+
+```
+.venv/bin/bartendro-db import /path/to/old/bartendro.db   # the old file is only read
+.venv/bin/bartendro-db show                               # dispensers + drinks it can make
+```
+
+The import lists anything it skipped or changed. Old custom drinks ("customizable margarita")
+and the wanted-drinks list are not carried over. The admin password is kept but stored hashed;
+`bartendro-db set-password` changes it.
+
 ## Mini-router (3-port board)
 
 The 3-port mini-router (`hardware/minirouter`, `firmware/mini-router`) talks to the Pi exactly
