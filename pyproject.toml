@@ -32,3 +32,5 @@ packages = ["src/bartendro"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# The repo lives on a NAS share where pytest can't write its cache (leaves pytest-cache-files-* dirs).
+addopts = "-p no:cacheprovider"
