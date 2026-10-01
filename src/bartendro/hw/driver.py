@@ -49,12 +49,15 @@ class Dispenser:
 class Driver:
     """`serial` is a pyserial-like object (read/write/reset_input_buffer/reset_output_buffer/
     timeout attribute); `router` is a RouterSelect (or the simulator's stand-in);
-    `status_led` is optional."""
+    `status_led` is optional. `ports` is how many router ports to scan (3 on the mini-router)."""
 
-    def __init__(self, serial, router, status_led=None):
+    def __init__(self, serial, router, status_led=None, ports: int = MAX_DISPENSERS):
+        if not 1 <= ports <= MAX_DISPENSERS:
+            raise DriverError(f"ports must be 1-{MAX_DISPENSERS}, not {ports}")
         self.ser = serial
         self.router = router
         self.status_led = status_led
+        self.ports = ports
         self.dispensers: list[Dispenser] = []
         self.version = DISPENSER_DEFAULT_VERSION
         self.startup_log: list[str] = []
@@ -82,7 +85,7 @@ class Driver:
         time.sleep(0.001)
         self.ser.timeout = 0.01
 
-        for port in range(MAX_DISPENSERS):
+        for port in range(self.ports):
             self.router.select(port)
             time.sleep(0.01)
             for attempt in range(DISCOVERY_RETRIES):

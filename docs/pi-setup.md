@@ -54,6 +54,25 @@ python3 -m venv --system-site-packages .venv   # system packages = gpiozero/lgpi
 (useful on a PC). The old Python 2 server (`ui/`) must not run at the same time - it holds
 the serial port.
 
+## Mini-router (3-port board)
+
+The 3-port mini-router (`hardware/minirouter`, `firmware/mini-router`) talks to the Pi exactly
+like the 15-port router (same I2C address and commands), so everything above applies. Pass
+`--ports 3` so discovery only scans the ports it has:
+
+```
+.venv/bin/bartendro-hw --ports 3 -v discover
+```
+
+- Port numbering: port 0 = PD4, 1 = PD3, 2 = PD0 on the AVR. Which connector that is isn't
+  marked in the firmware: plug one dispenser in, run `discover`, note the port it reports.
+- Its firmware still uses the pre-August-2013 way of relaying dispenser replies (only on a change
+  against a remembered pin level), and it doesn't set the reply line at power-up. Expect a few
+  "inconsistent, retrying" lines on the first port after a reset; discovery retries them. If
+  replies stay garbled, lost ACKs or "is_dispensing ... failed" warnings show up on a mini-router
+  but not on the 15-port router, suspect this firmware: the 15-port router's relaying code can be
+  ported to it (needs avr-gcc and an AVR programmer).
+
 ## What to check on real hardware
 
 - All dispensers found, in port order; no "ID CONFLICT" lines.

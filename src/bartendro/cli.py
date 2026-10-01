@@ -6,6 +6,7 @@ Examples (on the Pi):
     bartendro-hw pour 3 30          # 30 ml from dispenser #3
     bartendro-hw level
     bartendro-hw --sim 15 discover  # no hardware needed
+    bartendro-hw --ports 3 discover # mini-router (3 ports)
 Dispenser numbers are 1-based, in the order they were found (normally port order).
 """
 
@@ -149,6 +150,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--version", action="version", version=__version__)
     ap.add_argument("--device", help="serial device (default: /dev/serial0, ttyAMA0, ttyS0)")
     ap.add_argument("--i2c-bus", type=int, default=1, help="I2C bus of the router board (default 1)")
+    ap.add_argument("--ports", type=int, default=15, choices=range(1, 16), metavar="N",
+                    help="router ports to scan: 15 on the full router, 3 on the mini-router (default 15)")
     ap.add_argument("--sim", type=int, metavar="N", default=0, help="simulate N dispensers, no hardware")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("-y", "--yes", action="store_true", help="don't ask before running pumps")
@@ -195,7 +198,8 @@ def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING,
                         format="%(levelname)s %(name)s: %(message)s")
     try:
-        with open_driver(device=args.device, i2c_bus=args.i2c_bus, simulate=args.sim) as driver:
+        with open_driver(device=args.device, i2c_bus=args.i2c_bus, simulate=args.sim,
+                         ports=args.ports) as driver:
             if args.sim:
                 driver.sim.time_scale = 1.0
             return args.fn(driver, args)

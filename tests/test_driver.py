@@ -34,6 +34,14 @@ def test_discovers_small_bot_with_gaps():
     assert [(x.index, x.port, x.id) for x in d.dispensers] == [(0, 0, 10), (1, 1, 11), (2, 5, 12)]
 
 
+def test_ports_limits_discovery():
+    # mini-router: only ports 0-2 exist, so a dispenser on port 5 is never seen
+    bus = SimBus({0: SimDispenser(10), 2: SimDispenser(12), 5: SimDispenser(15)})
+    d = Driver(bus.serial, bus.router, ports=3)
+    d.discover()
+    assert [(x.port, x.id) for x in d.dispensers] == [(0, 10), (2, 12)]
+
+
 def test_id_zero_is_ignored_and_duplicates_are_dropped():
     bus = SimBus({0: SimDispenser(0), 1: SimDispenser(7), 2: SimDispenser(7), 3: SimDispenser(9)})
     d = make(bus)
@@ -118,3 +126,4 @@ def test_cli_simulated(capsys):
     assert main(["--sim", "3", "--yes", "pour", "2", "5"]) == 0
     assert main(["--sim", "3", "level"]) == 0
     assert main(["--sim", "3", "info", "1"]) == 0
+    assert main(["--sim", "3", "--ports", "3", "discover"]) == 0

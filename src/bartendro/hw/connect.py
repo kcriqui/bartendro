@@ -6,7 +6,7 @@ import os
 from contextlib import contextmanager
 
 from . import protocol as p
-from .driver import Driver
+from .driver import MAX_DISPENSERS, Driver
 from .router import RouterSelect
 from .simulator import SimBus
 from .status_led import StatusLED
@@ -32,11 +32,11 @@ def find_serial_device() -> str:
 
 @contextmanager
 def open_driver(device: str | None = None, i2c_bus: int = 1, simulate: int = 0,
-                status_led: bool = True):
+                status_led: bool = True, ports: int = MAX_DISPENSERS):
     """Yield a Driver that has already discovered the dispensers."""
     if simulate:
         bus = SimBus.with_dispensers(simulate)
-        driver = Driver(bus.serial, bus.router)
+        driver = Driver(bus.serial, bus.router, ports=ports)
         driver.sim = bus
         driver.discover()
         yield driver
@@ -54,13 +54,13 @@ def open_driver(device: str | None = None, i2c_bus: int = 1, simulate: int = 0,
     except serial.SerialException as e:
         raise ConnectError(f"cannot open {device}: {e}") from e
 
-    router = RouterSelect(bus=i2c_bus)
+    router = RouterSelect(bus=i2c_bus, max_ports=ports)
     led = StatusLED() if status_led else None
     try:
         router.open()
         if led and not led.open():
             led = None
-        driver = Driver(ser, router, led)
+        driver = Driver(ser, router, led, ports=ports)
         driver.device = device
         driver.discover()
         yield driver
