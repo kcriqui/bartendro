@@ -89,6 +89,9 @@ class Drink(Base):
     popular: Mapped[bool] = mapped_column(Boolean, default=False)  # old "the essentials" section
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)   # listed on the menu (old "available")
     size_ml: Mapped[int | None] = mapped_column(Integer)  # per-drink glass size; None = option drink_size
+    instructions: Mapped[str] = mapped_column(Text, default="")  # e.g. "Shake with ice, strain."
+    glass: Mapped[str] = mapped_column(String(50), default="")
+    source: Mapped[str] = mapped_column(String(50), default="")  # "legacy" (old db), "classics" (bundled), ""
 
     items: Mapped[list[RecipeItem]] = relationship(back_populates="drink", cascade="all, delete-orphan",
                                                    order_by="RecipeItem.position")
@@ -99,6 +102,9 @@ class Drink(Base):
 
 class RecipeItem(Base):
     __tablename__ = "recipe_item"
+    """One ingredient of a drink: its share of the mix (`parts`). Recipes from the bundled
+    cocktail file use ml as parts and keep the amount as written (`amount` + `unit`, e.g. 2 oz)."""
+    __tablename__ = "recipe_item"
     __table_args__ = (UniqueConstraint("drink_id", "ingredient_id"),
                       CheckConstraint("parts > 0", name="parts_positive"))
 
@@ -106,6 +112,8 @@ class RecipeItem(Base):
     drink_id: Mapped[int] = mapped_column(ForeignKey("drink.id", ondelete="CASCADE"), index=True)
     ingredient_id: Mapped[int] = mapped_column(ForeignKey("ingredient.id"))
     parts: Mapped[float] = mapped_column(Float)
+    amount: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(20), default="")
     position: Mapped[int] = mapped_column(Integer, default=0)
 
     drink: Mapped[Drink] = relationship(back_populates="items")

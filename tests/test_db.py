@@ -286,7 +286,7 @@ def test_scale_recipe_leaves_out_manual_ingredients(session):
 def test_dbcli(tmp_path, capsys):
     db = str(tmp_path / "cli.db")
     assert dbcli(["--db", db, "upgrade"]) == 0
-    assert "schema none -> 0001" in capsys.readouterr().out
+    assert "schema none -> 0002" in capsys.readouterr().out
     assert dbcli(["--db", db, "import", str(DEFAULT_DB)]) == 0
     assert "83 drinks" in capsys.readouterr().out
     assert dbcli(["--db", db, "import", str(DEFAULT_DB)]) == 2  # already has data

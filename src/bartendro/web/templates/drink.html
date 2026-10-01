@@ -5,6 +5,10 @@
          data-max="{{ max_size }}" data-steps="{{ opts.strength_steps }}">
   <h1>{{ drink.name }}</h1>
   {% if drink.description %}<p class="desc">{{ drink.description }}</p>{% endif %}
+  {% if drink.glass or drink.instructions %}
+  <p class="serve">{% if drink.glass %}<span class="glass">{{ drink.glass }} glass</span>{% endif %}
+    {{ drink.instructions }}</p>
+  {% endif %}
 
   <table class="recipe" id="recipe">
     {% for item in drink.items %}

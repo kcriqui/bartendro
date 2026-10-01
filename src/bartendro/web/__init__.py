@@ -25,7 +25,8 @@ from sqlalchemy.orm import selectinload
 from .. import __version__
 from ..bot import Bot, BusyError, CantPourError
 from ..db import options
-from ..db.menu import makeable_drinks
+from ..db import recipes
+from ..db.menu import makeable_drinks, one_bottle_away, suggest_bottles
 from ..db.models import Dispenser, Drink, Ingredient, Kind, PourLog, RecipeItem, utcnow
 
 log = logging.getLogger(__name__)
@@ -136,8 +137,9 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
             ingredients = s.scalars(select(Ingredient).where(~Ingredient.manual)
                                     .order_by(Ingredient.name)).all()
             n_makeable = len(makeable_drinks(s, dispenser_count=bot.dispenser_count))
+            away = one_bottle_away(s, dispenser_count=bot.dispenser_count)
             return page(request, "admin/dispensers.html", rows=rows, ingredients=ingredients,
-                        n_makeable=n_makeable)
+                        n_makeable=n_makeable, away=away)
 
     @app.post("/admin/dispensers")
     async def save_dispensers(request: Request):
@@ -165,7 +167,22 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
                                .order_by(func.lower(Drink.name))).all()
             can = {d.id for d in makeable_drinks(s, dispenser_count=bot.dispenser_count,
                                                  enabled_only=False)}
-            return page(request, "admin/drinks.html", drinks=drinks, can=can)
+            n_classics = len(recipes.read().get("drink", []))
+            return page(request, "admin/drinks.html", drinks=drinks, can=can, n_classics=n_classics,
+                        loaded=request.query_params.get("loaded"))
+
+    @app.post("/admin/recipes/load")
+    def load_recipes():
+        with sessions() as s:
+            report = recipes.load(s)
+        return RedirectResponse(f"/admin/drinks?loaded={report.counts['drinks added']}", status_code=303)
+
+    @app.get("/admin/plan")
+    def admin_plan(request: Request, pumps: int = 3):
+        pumps = max(1, min(15, pumps))
+        with sessions() as s:
+            bottles, drinks = suggest_bottles(s, pumps)
+            return page(request, "admin/plan.html", pumps=pumps, bottles=bottles, drinks=drinks)
 
     @app.get("/admin/drink/{drink_id}")
     def admin_drink(request: Request, drink_id: str):
@@ -201,7 +218,10 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
                     p = float(amount)
                     if p > 0:
                         parts[int(ing)] = parts.get(int(ing), 0) + p
-            drink.items = [RecipeItem(ingredient_id=i, parts=p, position=n)
+            s.add(drink)
+            drink.items.clear()
+            s.flush()  # delete the old rows first: (drink, ingredient) is unique
+            drink.items = [RecipeItem(ingredient_id=i, parts=p, position=n)  # edited: no "as written" amount
                            for n, (i, p) in enumerate(parts.items())]
             s.add(drink)
             s.commit()

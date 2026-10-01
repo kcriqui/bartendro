@@ -4,6 +4,8 @@ Examples:
     bartendro-db upgrade                      # create / migrate (path from the config file)
     bartendro-db import /path/to/old/bartendro.db
     bartendro-db show                         # dispensers and the drinks you can make
+    bartendro-db load-recipes                 # add the bundled classic drinks
+    bartendro-db suggest 3                    # best 3 bottles for a 3-pump bot
     bartendro-db --db test.db show
 """
 
@@ -21,7 +23,8 @@ from . import config as config_mod
 from .db import current_revision, make_engine, open_db, upgrade
 from .db import options
 from .db.importer import ImportError_, import_legacy
-from .db.menu import makeable_drinks
+from .db import recipes
+from .db.menu import makeable_drinks, one_bottle_away, suggest_bottles
 from .db.models import Dispenser, Drink, Ingredient, PourLog
 
 
@@ -76,6 +79,40 @@ def cmd_show(args) -> int:
         print(f"Can make {len(drinks)} drink(s):")
         for d in drinks:
             print(f"  {d.name}")
+        away = one_bottle_away(s, dispenser_count=count)
+        if away:
+            print("One bottle away:")
+            for ing, unlocked in away:
+                print(f"  load {ing.name} to make: {', '.join(d.name for d in unlocked)}")
+    return 0
+
+
+def cmd_load_recipes(args) -> int:
+    path = _db_path(args)
+    Session = open_db(path)
+    with Session() as s:
+        report = recipes.load(s, args.file, update=args.update)
+    print(f"{args.file or 'bundled classic drinks'} -> {path}:")
+    for what, n in report.counts.items():
+        print(f"  {n:5d} {what}")
+    for note in report.notes:
+        print(f"  - {note}")
+    return 0
+
+
+def cmd_suggest(args) -> int:
+    Session = open_db(_db_path(args))
+    with Session() as s:
+        keep = []
+        for name in args.keep or []:
+            ing = s.scalar(select(Ingredient).where(func.lower(Ingredient.name) == name.lower()))
+            if ing is None:
+                print(f"error: no ingredient {name!r}", file=sys.stderr)
+                return 2
+            keep.append(ing.id)
+        bottles, drinks = suggest_bottles(s, args.pumps, keep)
+        print(f"Best {args.pumps} bottle(s): {', '.join(b.name for b in bottles)}")
+        print(f"They make {len(drinks)} drink(s): {', '.join(d.name for d in drinks) or '-'}")
     return 0
 
 
@@ -126,6 +163,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--dispensers", type=int, help="only count the first N dispensers")
     s.set_defaults(fn=cmd_show)
 
+    s = sub.add_parser("load-recipes", help="add the bundled classic drinks (or a file like it)")
+    s.add_argument("--file", help="recipe file (default: the bundled data/classics.toml)")
+    s.add_argument("--update", action="store_true", help="refresh drinks this command added before")
+    s.set_defaults(fn=cmd_load_recipes)
+
+    s = sub.add_parser("suggest", help="which bottles make the most drinks (plan a small bot)")
+    s.add_argument("pumps", type=int)
+    s.add_argument("--keep", action="append", metavar="INGREDIENT", help="bottle that must be included")
+    s.set_defaults(fn=cmd_suggest)
+
     sub.add_parser("set-password", help="set the admin password").set_defaults(fn=cmd_set_password)
 
     s = sub.add_parser("revision", help="(developers) autogenerate a migration after changing models.py")
@@ -139,7 +186,7 @@ def main(argv=None) -> int:
     try:
         args.config = config_mod.load(args.config)
         return args.fn(args)
-    except (config_mod.ConfigError, ImportError_, RuntimeError) as e:
+    except (config_mod.ConfigError, ImportError_, recipes.RecipeFileError, RuntimeError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
 

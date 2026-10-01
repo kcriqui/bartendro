@@ -29,6 +29,16 @@
 <button class="btn primary">Save</button>
 </form>
 
+{% if away %}
+<h3>One bottle away</h3>
+<table class="grid">
+  {% for ing, drinks in away %}
+  <tr><td>Load <b>{{ ing.name }}</b></td><td>{{ drinks | map(attribute="name") | join(", ") }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+<p><a href="/admin/plan?pumps={{ rows|length }}">Which {{ rows|length }} bottles make the most drinks?</a></p>
+
 <h3>Machine</h3>
 <div class="button-row">
   <button class="btn" data-post="/api/clean" data-body='{"which": "all"}'>Clean all</button>

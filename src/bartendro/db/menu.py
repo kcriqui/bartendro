@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from . import options
-from .models import Dispenser, Drink, Ingredient, Kind, Level
+from .models import Dispenser, Drink, Ingredient, Kind, Level, RecipeItem
 
 STRENGTH_STEP = 0.25  # each strength/tartness step changes those ingredients by 25% (old drink page)
 
@@ -64,3 +64,58 @@ def scale_recipe(drink: Drink, size_ml: float, strength: int = 0, tartness: int 
         return {}
     return {i: size_ml * parts / total for i, parts in adjusted.items()
             if include_manual or i not in manual}
+
+
+def _needs(session: Session, enabled_only: bool = True) -> dict[int, set[int]]:
+    """{drink id: ingredient ids the pumps must pour} (manual ingredients left out)."""
+    q = select(Drink).options(selectinload(Drink.items).selectinload(RecipeItem.ingredient))
+    if enabled_only:
+        q = q.where(Drink.enabled)
+    return {d.id: {i.ingredient_id for i in d.items if not i.ingredient.manual}
+            for d in session.scalars(q) if d.items}
+
+
+def one_bottle_away(session: Session, dispenser_count: int | None = None,
+                    limit: int = 5) -> list[tuple[Ingredient, list[Drink]]]:
+    """Ingredients that would each make more drinks possible if loaded: [(ingredient, the
+    drinks it unlocks)], most drinks first. Only drinks missing exactly that one ingredient."""
+    have = available_ingredients(session, dispenser_count)
+    unlocks: dict[int, list[int]] = {}
+    for drink_id, needs in _needs(session).items():
+        missing = needs - have
+        if len(missing) == 1:
+            unlocks.setdefault(missing.pop(), []).append(drink_id)
+    ranked = sorted(unlocks.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:limit]
+    out = []
+    for ing_id, drink_ids in ranked:
+        drinks = sorted((session.get(Drink, d) for d in drink_ids), key=lambda d: d.name.lower())
+        out.append((session.get(Ingredient, ing_id), drinks))
+    return out
+
+
+def suggest_bottles(session: Session, pumps: int, keep: list[int] | None = None
+                    ) -> tuple[list[Ingredient], list[Drink]]:
+    """Pick `pumps` bottles that make the most (enabled) drinks: greedy, each step adding the
+    bottle that completes the most drinks (ties: the one that gets most drinks closest).
+    `keep`: ingredient ids that must be among them. For planning a small bot."""
+    needs = _needs(session)
+    chosen: list[int] = list(dict.fromkeys(keep or []))[:pumps]
+    candidates = set().union(*needs.values()) if needs else set()
+
+    def complete(have: set[int]) -> int:
+        return sum(1 for n in needs.values() if n <= have)
+
+    def closeness(have: set[int]) -> int:
+        return sum(len(n & have) for n in needs.values() if len(n - have) <= 1)
+
+    while len(chosen) < pumps:
+        have = set(chosen)
+        best = max((c for c in candidates if c not in have),
+                   key=lambda c: (complete(have | {c}), closeness(have | {c}), -c), default=None)
+        if best is None:
+            break
+        chosen.append(best)
+    have = set(chosen)
+    drinks = [session.get(Drink, d) for d, n in needs.items() if n <= have]
+    return ([session.get(Ingredient, i) for i in chosen],
+            sorted(drinks, key=lambda d: (d.sort_name or d.name).lower()))

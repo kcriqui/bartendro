@@ -65,6 +65,23 @@ def test_pages_render(env):
     assert 'class="on"' in client.get("/admin/drinks").text  # tab highlighted
 
 
+def test_classic_recipes_and_plan(env):
+    client, b, _, sessions = env
+    r = client.post("/admin/recipes/load", follow_redirects=False)
+    assert r.status_code == 303 and "loaded=" in r.headers["location"]
+    assert "Added" in client.get(r.headers["location"]).text
+    with sessions() as s:
+        godmother = s.scalar(select(Drink).where(Drink.name == "Godmother"))
+        assert godmother.source == "classics"
+    page = client.get(f"/drink/{godmother.id}").text
+    assert "old fashioned glass" in page and "Over ice." in page
+    plan = client.get(f"/api/drink/{godmother.id}/plan").json()  # Vodka #1, Amaretto #11
+    assert {p["dispenser"] for p in plan["pumps"]} == {1, 11}
+    assert "One bottle away" in client.get("/admin").text
+    plan_page = client.get("/admin/plan?pumps=3").text
+    assert "With <b>" in plan_page
+
+
 def test_make_drink_api_and_websocket(env):
     client, b, bus, sessions = env
     d = black_russian(sessions)
@@ -141,6 +158,12 @@ def test_admin_drink_edit(env):
         drink_id = d.id
     assert "Screwdriver Deluxe" in client.get("/").text
     assert client.post(f"/admin/drink/{drink_id}/toggle/popular").json() == {"popular": True}
+    # edit it, keeping vodka (the old rows must go before the new ones are added)
+    r = client.post(f"/admin/drink/{drink_id}", data={"name": "Screwdriver Deluxe", "enabled": "on",
+                                                     "ingredient": ["1", "4"], "parts": ["1", "3"]})
+    assert r.status_code == 200
+    with sessions() as s:
+        assert {(i.ingredient_id, i.parts) for i in s.get(Drink, drink_id).items} == {(1, 1), (4, 3)}
     client.post(f"/admin/drink/{drink_id}", data={"delete": "1"})
     with sessions() as s:
         assert s.get(Drink, drink_id) is None

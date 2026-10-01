@@ -190,7 +190,7 @@ def _import_drinks(old: _Old, session: Session, report: Report) -> None:
                           sort_name=_text(_get(n, "sortname")) if n is not None else "",
                           description=_text(_get(r, "desc")),
                           popular=_bool(_get(r, "popular"), False),
-                          enabled=_bool(_get(r, "available"), True)))
+                          enabled=_bool(_get(r, "available"), True), source="legacy"))
         drink_ids.add(r["id"])
     session.flush()
     report.counts["drinks"] = len(drink_ids)

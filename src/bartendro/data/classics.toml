@@ -1,0 +1,456 @@
+# Bundled drinks for Bartendro: `bartendro-db load-recipes` (or Admin > Drinks) adds them.
+#
+# Only drinks a bot can make on its own: a ratio of liquids poured straight into a glass of ice.
+# Nothing shaken, stirred and strained, muddled, blended or dashed.
+#
+# Ingredient amounts are facts (classic and IBA specs, written in ml); the descriptions and
+# instructions were written for this project. GPL-2.0 like the rest of the code.
+#
+# [[ingredient]]: the generic ingredients the drinks use.
+#   aliases: other names for the same thing (matched against ingredients already in the
+#            database, e.g. names from an old bartendro.db), so nothing is duplicated.
+#   brands:  specific bottles that can stand in for it; an existing ingredient with one of
+#            these names is linked to it (Kahlua -> Coffee Liqueur) unless it already has a link.
+# [[drink]]: ingredients = [[amount, unit, ingredient], ...]; units ml, cl or oz.
+
+# ------------------------------------------------------------------ spirits
+[[ingredient]]
+name = "Vodka"
+kind = "alcohol"
+abv = 40
+
+[[ingredient]]
+name = "White Rum"
+kind = "alcohol"
+abv = 40
+aliases = ["Rum, Light", "Light Rum", "Silver Rum", "Rum"]
+brands = ["Bacardi", "Bacardi Superior"]
+
+[[ingredient]]
+name = "Dark Rum"
+kind = "alcohol"
+abv = 40
+aliases = ["Rum, Dark"]
+brands = ["Gosling's Black Seal", "Myers's"]
+
+[[ingredient]]
+name = "Gin"
+kind = "alcohol"
+abv = 40
+
+[[ingredient]]
+name = "Tequila"
+kind = "alcohol"
+abv = 40
+brands = ["Tequila, Silver", "Tequila, Gran Centenario", "Blanco Tequila", "Reposado Tequila"]
+
+[[ingredient]]
+name = "Whiskey"
+kind = "alcohol"
+abv = 40
+aliases = ["Whisky"]
+brands = ["Bourbon", "Rye Whiskey", "Jack Daniel's", "Jameson", "Scotch Whisky"]
+
+[[ingredient]]
+name = "Scotch Whisky"
+kind = "alcohol"
+abv = 40
+aliases = ["Scotch"]
+
+[[ingredient]]
+name = "Brandy"
+kind = "alcohol"
+abv = 40
+brands = ["Cognac"]
+
+# ------------------------------------------------------------------ liqueurs, wine
+[[ingredient]]
+name = "Triple Sec"
+kind = "alcohol"
+abv = 30
+aliases = ["Orange Liqueur"]
+brands = ["Cointreau", "Grand Marnier"]
+
+[[ingredient]]
+name = "Coffee Liqueur"
+kind = "alcohol"
+abv = 20
+brands = ["Kahlua", "Kahlúa", "Tia Maria"]
+
+[[ingredient]]
+name = "Amaretto"
+kind = "alcohol"
+abv = 24
+brands = ["Disaronno"]
+
+[[ingredient]]
+name = "Peach Schnapps"
+kind = "alcohol"
+abv = 20
+
+[[ingredient]]
+name = "Campari"
+kind = "alcohol"
+abv = 25
+
+[[ingredient]]
+name = "Aperol"
+kind = "alcohol"
+abv = 11
+
+[[ingredient]]
+name = "Sweet Vermouth"
+kind = "alcohol"
+abv = 16
+aliases = ["Vermouth, Sweet", "Red Vermouth", "Rosso Vermouth"]
+
+[[ingredient]]
+name = "Drambuie"
+kind = "alcohol"
+abv = 40
+
+[[ingredient]]
+name = "Creme de Cassis"
+kind = "alcohol"
+abv = 15
+aliases = ["Crème de Cassis", "Cassis"]
+
+[[ingredient]]
+name = "Sparkling Wine"
+kind = "alcohol"
+abv = 11
+brands = ["Prosecco", "Champagne", "Cava"]
+
+[[ingredient]]
+name = "Dry White Wine"
+kind = "alcohol"
+abv = 12
+aliases = ["White Wine"]
+
+# ------------------------------------------------------------------ juices, syrups
+[[ingredient]]
+name = "Orange Juice"
+kind = "sweet"
+
+[[ingredient]]
+name = "Cranberry Juice"
+kind = "sweet"
+
+[[ingredient]]
+name = "Pineapple Juice"
+kind = "sweet"
+
+[[ingredient]]
+name = "Grapefruit Juice"
+kind = "tart"
+
+[[ingredient]]
+name = "Lime Juice"
+kind = "tart"
+
+[[ingredient]]
+name = "Lemon Juice"
+kind = "tart"
+
+[[ingredient]]
+name = "Grenadine"
+kind = "sweet"
+
+[[ingredient]]
+name = "Simple Syrup"
+kind = "sweet"
+aliases = ["Sugar Syrup"]
+
+[[ingredient]]
+name = "Cream"
+kind = "other"
+aliases = ["Heavy Cream", "Fresh Cream"]
+
+# ------------------------------------------------------------------ mixers
+[[ingredient]]
+name = "Cola"
+kind = "sweet"
+brands = ["Coca-Cola", "Coke", "Pepsi"]
+
+[[ingredient]]
+name = "Ginger Beer"
+kind = "sweet"
+
+[[ingredient]]
+name = "Ginger Ale"
+kind = "sweet"
+
+[[ingredient]]
+name = "Tonic Water"
+kind = "other"
+aliases = ["Tonic"]
+
+[[ingredient]]
+name = "Soda Water"
+kind = "other"
+aliases = ["Club Soda", "Sparkling Water", "Seltzer"]
+
+[[ingredient]]
+name = "Grapefruit Soda"
+kind = "sweet"
+brands = ["Squirt", "Jarritos Toronja"]
+
+# ================================================================== drinks
+
+[[drink]]
+name = "Screwdriver"
+glass = "highball"
+popular = true
+description = "Vodka and orange juice. Simple and bright."
+instructions = "Over ice."
+ingredients = [[50, "ml", "Vodka"], [100, "ml", "Orange Juice"]]
+
+[[drink]]
+name = "Cape Cod"
+glass = "highball"
+description = "Vodka and cranberry, tart and easy."
+instructions = "Over ice; a lime wedge if you have one."
+ingredients = [[45, "ml", "Vodka"], [135, "ml", "Cranberry Juice"]]
+
+[[drink]]
+name = "Greyhound"
+glass = "highball"
+description = "Vodka with grapefruit juice: dry and refreshing."
+instructions = "Over ice."
+ingredients = [[45, "ml", "Vodka"], [135, "ml", "Grapefruit Juice"]]
+
+[[drink]]
+name = "Madras"
+glass = "highball"
+description = "Vodka, cranberry and a splash of orange."
+instructions = "Over ice."
+ingredients = [[45, "ml", "Vodka"], [90, "ml", "Cranberry Juice"], [45, "ml", "Orange Juice"]]
+
+[[drink]]
+name = "Bay Breeze"
+glass = "highball"
+description = "Vodka, cranberry and pineapple."
+instructions = "Over ice."
+ingredients = [[45, "ml", "Vodka"], [90, "ml", "Cranberry Juice"], [45, "ml", "Pineapple Juice"]]
+
+[[drink]]
+name = "Sea Breeze"
+glass = "highball"
+description = "Vodka and cranberry with a little grapefruit."
+instructions = "Over ice."
+ingredients = [[40, "ml", "Vodka"], [120, "ml", "Cranberry Juice"], [30, "ml", "Grapefruit Juice"]]
+
+[[drink]]
+name = "Sex on the Beach"
+glass = "highball"
+popular = true
+description = "Vodka, peach schnapps, orange and cranberry. Fruity party favourite."
+instructions = "Over ice."
+ingredients = [[40, "ml", "Vodka"], [20, "ml", "Peach Schnapps"], [40, "ml", "Orange Juice"],
+               [40, "ml", "Cranberry Juice"]]
+
+[[drink]]
+name = "Fuzzy Navel"
+glass = "highball"
+description = "Peach schnapps and orange juice."
+instructions = "Over ice."
+ingredients = [[45, "ml", "Peach Schnapps"], [135, "ml", "Orange Juice"]]
+
+[[drink]]
+name = "Hairy Navel"
+glass = "highball"
+description = "A Fuzzy Navel with vodka in it."
+instructions = "Over ice."
+ingredients = [[30, "ml", "Vodka"], [30, "ml", "Peach Schnapps"], [120, "ml", "Orange Juice"]]
+
+[[drink]]
+name = "Vodka Tonic"
+glass = "highball"
+description = "Vodka and tonic water."
+instructions = "Over ice; a lime wedge if you have one."
+ingredients = [[50, "ml", "Vodka"], [150, "ml", "Tonic Water"]]
+
+[[drink]]
+name = "Moscow Mule"
+glass = "mule mug or highball"
+popular = true
+description = "Vodka, spicy ginger beer and lime."
+instructions = "Over ice."
+ingredients = [[45, "ml", "Vodka"], [120, "ml", "Ginger Beer"], [10, "ml", "Lime Juice"]]
+
+[[drink]]
+name = "Black Russian"
+glass = "old fashioned"
+description = "Vodka and coffee liqueur."
+instructions = "Over ice."
+ingredients = [[50, "ml", "Vodka"], [20, "ml", "Coffee Liqueur"]]
+
+[[drink]]
+name = "White Russian"
+glass = "old fashioned"
+popular = true
+description = "Vodka, coffee liqueur and cream."
+instructions = "Over ice."
+ingredients = [[50, "ml", "Vodka"], [20, "ml", "Coffee Liqueur"], [30, "ml", "Cream"]]
+
+[[drink]]
+name = "Godmother"
+glass = "old fashioned"
+description = "Vodka and amaretto, half and half."
+instructions = "Over ice."
+ingredients = [[35, "ml", "Vodka"], [35, "ml", "Amaretto"]]
+
+[[drink]]
+name = "Cuba Libre"
+glass = "highball"
+popular = true
+description = "Rum and cola with a squeeze of lime."
+instructions = "Over ice; a lime wedge if you have one."
+ingredients = [[50, "ml", "White Rum"], [120, "ml", "Cola"], [10, "ml", "Lime Juice"]]
+
+[[drink]]
+name = "Rum and Coke"
+glass = "highball"
+description = "Rum and cola, no lime."
+instructions = "Over ice."
+ingredients = [[50, "ml", "White Rum"], [150, "ml", "Cola"]]
+
+[[drink]]
+name = "Dark 'n' Stormy"
+glass = "highball"
+description = "Dark rum over ginger beer."
+instructions = "Over ice; a lime wedge if you have one."
+ingredients = [[60, "ml", "Dark Rum"], [100, "ml", "Ginger Beer"]]
+
+[[drink]]
+name = "Gin and Tonic"
+glass = "highball"
+popular = true
+description = "Gin and tonic water."
+instructions = "Over ice; a lime wedge if you have one."
+ingredients = [[50, "ml", "Gin"], [150, "ml", "Tonic Water"]]
+
+[[drink]]
+name = "Tom Collins"
+glass = "collins"
+description = "Gin, lemon and sugar, lengthened with soda."
+instructions = "Over ice."
+ingredients = [[45, "ml", "Gin"], [30, "ml", "Lemon Juice"], [15, "ml", "Simple Syrup"],
+               [60, "ml", "Soda Water"]]
+
+[[drink]]
+name = "Negroni"
+glass = "old fashioned"
+description = "Gin, Campari and sweet vermouth in equal parts. Bitter and bold."
+instructions = "Over ice; an orange slice if you have one."
+ingredients = [[30, "ml", "Gin"], [30, "ml", "Campari"], [30, "ml", "Sweet Vermouth"]]
+
+[[drink]]
+name = "Americano"
+glass = "old fashioned"
+description = "Campari and sweet vermouth with soda. Lighter than a Negroni."
+instructions = "Over ice."
+ingredients = [[30, "ml", "Campari"], [30, "ml", "Sweet Vermouth"], [30, "ml", "Soda Water"]]
+
+[[drink]]
+name = "Campari Soda"
+glass = "highball"
+description = "Campari topped with soda water."
+instructions = "Over ice."
+ingredients = [[50, "ml", "Campari"], [100, "ml", "Soda Water"]]
+
+[[drink]]
+name = "Garibaldi"
+glass = "highball"
+description = "Campari and orange juice."
+instructions = "Over ice."
+ingredients = [[50, "ml", "Campari"], [100, "ml", "Orange Juice"]]
+
+[[drink]]
+name = "Aperol Spritz"
+glass = "wine glass"
+popular = true
+description = "Aperol, sparkling wine and a splash of soda."
+instructions = "Over ice; an orange slice if you have one."
+ingredients = [[90, "ml", "Sparkling Wine"], [60, "ml", "Aperol"], [30, "ml", "Soda Water"]]
+
+[[drink]]
+name = "Mimosa"
+glass = "flute"
+description = "Sparkling wine and orange juice."
+instructions = "No ice."
+ingredients = [[75, "ml", "Sparkling Wine"], [75, "ml", "Orange Juice"]]
+
+[[drink]]
+name = "Kir"
+glass = "wine glass"
+description = "Dry white wine with a little blackcurrant liqueur."
+instructions = "No ice."
+ingredients = [[90, "ml", "Dry White Wine"], [10, "ml", "Creme de Cassis"]]
+
+[[drink]]
+name = "Tequila Sunrise"
+glass = "highball"
+popular = true
+description = "Tequila and orange juice with grenadine settling at the bottom."
+instructions = "Over ice."
+ingredients = [[45, "ml", "Tequila"], [90, "ml", "Orange Juice"], [15, "ml", "Grenadine"]]
+
+[[drink]]
+name = "Paloma"
+glass = "highball"
+description = "Tequila and grapefruit soda with a little lime."
+instructions = "Over ice; a pinch of salt if you like."
+ingredients = [[50, "ml", "Tequila"], [100, "ml", "Grapefruit Soda"], [5, "ml", "Lime Juice"]]
+
+[[drink]]
+name = "Whiskey and Cola"
+glass = "highball"
+description = "Whiskey and cola."
+instructions = "Over ice."
+ingredients = [[50, "ml", "Whiskey"], [150, "ml", "Cola"]]
+
+[[drink]]
+name = "Whiskey Ginger"
+glass = "highball"
+description = "Whiskey and ginger ale."
+instructions = "Over ice."
+ingredients = [[50, "ml", "Whiskey"], [150, "ml", "Ginger Ale"]]
+
+[[drink]]
+name = "Godfather"
+glass = "old fashioned"
+description = "Scotch and amaretto."
+instructions = "Over ice."
+ingredients = [[35, "ml", "Scotch Whisky"], [35, "ml", "Amaretto"]]
+
+[[drink]]
+name = "Rusty Nail"
+glass = "old fashioned"
+description = "Scotch with Drambuie's honey and herbs."
+instructions = "Over ice."
+ingredients = [[45, "ml", "Scotch Whisky"], [25, "ml", "Drambuie"]]
+
+[[drink]]
+name = "Horse's Neck"
+glass = "highball"
+description = "Brandy and ginger ale."
+instructions = "Over ice; a long lemon peel if you have one."
+ingredients = [[40, "ml", "Brandy"], [120, "ml", "Ginger Ale"]]
+
+[[drink]]
+name = "French Connection"
+glass = "old fashioned"
+description = "Brandy and amaretto."
+instructions = "Over ice."
+ingredients = [[35, "ml", "Brandy"], [35, "ml", "Amaretto"]]
+
+[[drink]]
+name = "Long Island Iced Tea"
+glass = "highball"
+popular = true
+description = "Five spirits, lemon, sugar and a splash of cola. Stronger than it tastes."
+instructions = "Over ice."
+ingredients = [[15, "ml", "Vodka"], [15, "ml", "Tequila"], [15, "ml", "White Rum"], [15, "ml", "Gin"],
+               [15, "ml", "Triple Sec"], [25, "ml", "Lemon Juice"], [30, "ml", "Simple Syrup"],
+               [30, "ml", "Cola"]]

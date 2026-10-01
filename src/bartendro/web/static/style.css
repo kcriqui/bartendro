@@ -113,3 +113,6 @@ input.short { width: 6em; }
   .drink h1, .drink .desc { grid-column: 1 / -1; }
   .drink .make-buttons { grid-column: 2; }
 }
+.serve { color: var(--muted); font-size: .95em; }
+.serve .glass { display: inline-block; padding: 2px 8px; margin-right: 6px; border-radius: 8px;
+                background: var(--panel2); color: var(--text); font-size: .85em; }

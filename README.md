@@ -34,19 +34,22 @@ src/bartendro/db -- SQLite database (SQLAlchemy + Alembic migrations), importer 
                     bartendro.db files; `bartendro-db`: upgrade, import, show, set-password
 src/bartendro/config.py -- per-bot settings file (docs/bartendro.example.toml)
 src/bartendro/bot.py -- the drink-making logic (port of the old mixer and state machine)
+src/bartendro/data/classics.toml -- bundled drinks (poured over ice, no shaking):
+                     `bartendro-db load-recipes`, `bartendro-db suggest 3` (plan a small bot)
 src/bartendro/web -- web app (FastAPI): menu, shots, admin, live pour status;
                      `bartendro-web --sim 15` runs it on a PC with simulated pumps
 tests            -- pytest suite, runs against the simulator (no hardware needed)
 docs/pi-setup.md -- Pi setup (UART, I2C, install) and the first hardware test
 
 Done so far: milestone 1 (hardware layer + command-line test tool), milestone 2 (database,
-importer for old `bartendro.db` files, per-bot config) and a first web app (milestone 3).
-Next: install scripts, then a cocktail recipe database. `ui/` stays until the new code pours
-correctly on real bots.
+importer for old `bartendro.db` files, per-bot config), a first web app (milestone 3) and a
+bundled recipe collection with a bottle planner (milestone 4). Next: install scripts (systemd,
+hotspot, kiosk). `ui/` stays until the new code pours correctly on real bots.
 
     pip install -e ".[dev]" && pytest
     bartendro-hw --sim 15 discover
     bartendro-db --db demo.db import ui/bartendro.db.default
+    bartendro-db --db demo.db load-recipes
     bartendro-web --sim 15 --db demo.db      # then open http://localhost:8080
 
 Downloading updated SD Card images
