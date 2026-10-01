@@ -269,9 +269,10 @@ class Driver:
     # ------------------------------------------------------------- high level
 
     def pour_ml(self, amounts: dict[int, float], always_fast: bool = False, poll: float = 0.1,
-                timeout: float = 120.0) -> None:
+                timeout: float = 120.0, ticks_per_ml: dict[int, float] | None = None) -> None:
         """Pour {dispenser index: ml} at the same time and wait until all pumps stop.
-        Same logic as mixer._dispense_recipe: amounts under 20 ml go at half speed."""
+        Same logic as mixer._dispense_recipe: amounts under 20 ml go at half speed.
+        `ticks_per_ml` overrides the calibration per dispenser index (default TICKS_PER_ML)."""
         for i, ml in amounts.items():
             if ml and not 0 < ml <= MAX_DISPENSE_ML:
                 raise DriverError(f"refusing to pour {ml} ml (limit {MAX_DISPENSE_ML})")
@@ -282,7 +283,7 @@ class Driver:
             for i, ml in amounts.items():
                 if not ml:
                     continue
-                ticks = int(ml * TICKS_PER_ML)
+                ticks = int(ml * (ticks_per_ml or {}).get(i, TICKS_PER_ML))
                 speed = HALF_SPEED if ml < SLOW_DISPENSE_THRESHOLD and not always_fast else FULL_SPEED
                 active.append(i)  # before sending: the command may arrive even if its ACK is lost
                 self.set_motor_direction(i, p.MOTOR_DIRECTION_FORWARD)
