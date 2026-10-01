@@ -1,0 +1,18 @@
+{% extends "admin/layout.html" %}
+{% set tab = "drinks" %}
+{% block title %}Drinks - {{ bot_name }}{% endblock %}
+{% block admin %}
+<p><a class="btn primary" href="/admin/drink/new">New drink</a></p>
+<table class="grid">
+  <tr><th>Drink</th><th>Can make</th><th title="shown on the menu">Menu</th><th title="the essentials section">Essential</th></tr>
+  {% for d in drinks %}
+  <tr>
+    <td><a href="/admin/drink/{{ d.id }}">{{ d.name }}</a>
+      <span class="muted">{{ d.items | map(attribute="ingredient.name") | join(", ") }}</span></td>
+    <td>{{ "yes" if d.id in can else "" }}</td>
+    <td><input type="checkbox" data-toggle="/admin/drink/{{ d.id }}/toggle/enabled" {% if d.enabled %}checked{% endif %}></td>
+    <td><input type="checkbox" data-toggle="/admin/drink/{{ d.id }}/toggle/popular" {% if d.popular %}checked{% endif %}></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

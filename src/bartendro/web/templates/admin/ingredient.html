@@ -1,0 +1,28 @@
+{% extends "admin/layout.html" %}
+{% set tab = "ingredients" %}
+{% block title %}{{ ing.name or "New ingredient" }} - {{ bot_name }}{% endblock %}
+{% block admin %}
+<form method="post" action="/admin/ingredient/{{ ing.id if ing.id else 'new' }}" class="form">
+  <label>Name <input name="name" value="{{ ing.name }}" required></label>
+  <label>Brand <input name="brand" value="{{ ing.brand or '' }}"></label>
+  <label>Description <textarea name="description" rows="3">{{ ing.description or '' }}</textarea></label>
+  <label>ABV % <input name="abv" class="short" inputmode="decimal" value="{{ '%g' % (ing.abv or 0) }}"></label>
+  <label>Kind <select name="kind">
+    {% for k in kinds %}<option value="{{ k.value }}" {% if k == ing.kind %}selected{% endif %}>{{ k.value }}</option>{% endfor %}
+  </select></label>
+  <p class="hint">Strength changes alcohol; tartness raises tart and lowers sweet ingredients.</p>
+  <label class="check"><input type="checkbox" name="manual" {% if ing.manual %}checked{% endif %}>
+    Added by hand (never pumped: garnish, ice, soda...)</label>
+  <label>A brand of <select name="generic_id">
+    <option value="">(nothing - this is a generic ingredient)</option>
+    {% for g in generics %}<option value="{{ g.id }}" {% if g.id == ing.generic_id %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
+  </select></label>
+  <p class="hint">E.g. Tito's is a brand of Vodka: with Tito's on a dispenser, drinks that ask for Vodka can be made.</p>
+  <div class="button-row">
+    <button class="btn primary">Save</button>
+    <a class="btn" href="/admin/ingredients">Cancel</a>
+    {% if ing.id %}<button class="btn danger" name="delete" value="1"
+        data-confirm="Delete {{ ing.name }}?">Delete</button>{% endif %}
+  </div>
+</form>
+{% endblock %}

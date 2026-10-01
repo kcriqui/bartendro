@@ -1,0 +1,42 @@
+{% extends "admin/layout.html" %}
+{% set tab = "dispensers" %}
+{% block title %}Dispensers - {{ bot_name }}{% endblock %}
+{% block admin %}
+<form method="post" action="/admin/dispensers">
+<table class="grid">
+  <tr><th>#</th><th>Bottle</th>{% if opts.use_liquid_level_sensors %}<th>Level</th>{% endif %}
+      <th title="pump calibration; empty = default 2.78">Ticks/ml</th><th>Pump</th></tr>
+  {% for d in rows %}
+  <tr>
+    <td class="num">{{ d.number }}</td>
+    <td><select name="ingredient{{ d.number }}">
+      <option value="">(empty)</option>
+      {% for i in ingredients %}
+      <option value="{{ i.id }}" {% if i.id == d.ingredient_id %}selected{% endif %}>{{ i.name }}</option>
+      {% endfor %}
+    </select></td>
+    {% if opts.use_liquid_level_sensors %}<td class="level-{{ d.level.value if d.level else 'unknown' }}">{{ d.level.value if d.level else "unknown" }}</td>{% endif %}
+    <td><input name="cal{{ d.number }}" class="short" inputmode="decimal" value="{{ d.ticks_per_ml or '' }}" placeholder="2.78"></td>
+    <td class="pump-buttons">
+      <button type="button" class="btn small" data-post="/api/dispenser/{{ d.number }}/test">Test {{ amount(opts.test_dispense_ml) }}</button>
+      <button type="button" class="btn small" data-post="/api/dispenser/{{ d.number }}/run" data-body='{"ms": 2000}'>Prime 2s</button>
+      <button type="button" class="btn small" data-post="/api/dispenser/{{ d.number }}/run" data-body='{"ms": 2000, "reverse": true}'>Reverse 2s</button>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<p>{{ n_makeable }} drink(s) can be made with these bottles.</p>
+<button class="btn primary">Save</button>
+</form>
+
+<h3>Machine</h3>
+<div class="button-row">
+  <button class="btn" data-post="/api/clean" data-body='{"which": "all"}'>Clean all</button>
+  {% if rows|length == 15 %}
+  <button class="btn" data-post="/api/clean" data-body='{"which": "left"}'>Clean left</button>
+  <button class="btn" data-post="/api/clean" data-body='{"which": "right"}'>Clean right</button>
+  {% endif %}
+  <button class="btn" data-post="/api/check-levels">Check levels</button>
+  <button class="btn danger" data-post="/api/reset">Reset</button>
+</div>
+{% endblock %}

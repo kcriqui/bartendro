@@ -75,6 +75,16 @@ The import lists anything it skipped or changed. Old custom drinks ("customizabl
 and the wanted-drinks list are not carried over. The admin password is kept but stored hashed;
 `bartendro-db set-password` changes it.
 
+## 6. Web app
+
+```
+.venv/bin/bartendro-web            # http://<pi address>:8080 from a phone, or the Pi's own screen
+```
+
+It uses the config file for the hardware and database. The old Python 2 server must not run
+at the same time. Starting it at boot (systemd), the hotspot and the kiosk browser come with
+milestone 5.
+
 ## Mini-router (3-port board)
 
 The 3-port mini-router (`hardware/minirouter`, `firmware/mini-router`) talks to the Pi exactly

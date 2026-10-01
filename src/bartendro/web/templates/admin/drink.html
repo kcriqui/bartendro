@@ -1,0 +1,40 @@
+{% extends "admin/layout.html" %}
+{% set tab = "drinks" %}
+{% block title %}{{ drink.name or "New drink" }} - {{ bot_name }}{% endblock %}
+{% block admin %}
+{% macro ingredient_select(selected) %}
+<select name="ingredient">
+  <option value=""></option>
+  {% for i in ingredients %}
+  <option value="{{ i.id }}" {% if i.id == selected %}selected{% endif %}>{{ i.name }}{% if i.manual %} (by hand){% endif %}</option>
+  {% endfor %}
+</select>
+{% endmacro %}
+{% set action = "/admin/drink/" ~ (drink.id if drink.id else "new") %}
+<form method="post" action="{{ action }}" class="form">
+  <label>Name <input name="name" value="{{ drink.name }}" required></label>
+  <label>Sort as <input name="sort_name" value="{{ drink.sort_name or '' }}" placeholder="(name)"></label>
+  <label>Description <textarea name="description" rows="3">{{ drink.description or '' }}</textarea></label>
+  <label>Glass size (ml) <input name="size_ml" class="short" inputmode="numeric" value="{{ drink.size_ml or '' }}"
+         placeholder="{{ opts.drink_size }}"></label>
+  <label class="check"><input type="checkbox" name="enabled" {% if drink.enabled %}checked{% endif %}> On the menu</label>
+  <label class="check"><input type="checkbox" name="popular" {% if drink.popular %}checked{% endif %}> In "the essentials"</label>
+
+  <h3>Ingredients (parts)</h3>
+  <table class="grid">
+    {% for item in drink.items %}
+    <tr><td>{{ ingredient_select(item.ingredient_id) }}</td>
+        <td><input name="parts" class="short" inputmode="decimal" value="{{ '%g' % item.parts }}"></td></tr>
+    {% endfor %}
+    {% for _ in range(blank_rows) %}
+    <tr><td>{{ ingredient_select(None) }}</td><td><input name="parts" class="short" inputmode="decimal"></td></tr>
+    {% endfor %}
+  </table>
+  <div class="button-row">
+    <button class="btn primary">Save</button>
+    <a class="btn" href="/admin/drinks">Cancel</a>
+    {% if drink.id %}<button class="btn danger" name="delete" value="1"
+        data-confirm="Delete {{ drink.name }}?">Delete</button>{% endif %}
+  </div>
+</form>
+{% endblock %}

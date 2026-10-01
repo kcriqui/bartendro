@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+{% macro cards(drinks) %}
+<div class="cards">
+  {% for d in drinks %}
+  <a class="card" href="/drink/{{ d.id }}">
+    <span class="card-name">{{ d.name }}</span>
+    {% if d.description %}<span class="card-desc">{{ d.description }}</span>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endmacro %}
+{% if not essentials and not others %}
+  <p class="empty">No drinks can be made right now. Check the bottles on the
+    <a href="/admin">dispenser page</a>.</p>
+{% endif %}
+{% if essentials %}
+  <h2 class="section">The essentials</h2>
+  {{ cards(essentials) }}
+{% endif %}
+{% if others %}
+  <h2 class="section">{% if essentials %}More drinks{% else %}Drinks{% endif %}</h2>
+  {{ cards(others) }}
+{% endif %}
+{% endblock %}

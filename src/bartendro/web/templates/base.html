@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16131a">
+<title>{% block title %}{{ bot_name }}{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<header class="top">
+  <a class="brand" href="/">{{ bot_name }}</a>
+  <nav>
+    <a href="/">Drinks</a>
+    <a href="/shots">Shots</a>
+    <a href="/admin">Admin</a>
+  </nav>
+</header>
+<div id="statusbar" class="statusbar state-{{ status.state }}" data-state="{{ status.state }}">
+  <span id="status-text"></span>
+</div>
+<main>
+{% block content %}{% endblock %}
+</main>
+
+<div id="overlay" class="overlay" hidden>
+  <div class="overlay-box">
+    <div id="overlay-spinner" class="spinner"></div>
+    <h2 id="overlay-title"></h2>
+    <p id="overlay-text"></p>
+    <ul id="overlay-manual"></ul>
+    <div class="overlay-buttons">
+      <button id="overlay-reset" class="btn danger" hidden>Reset</button>
+      <button id="overlay-close" class="btn" hidden>OK</button>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+<script>window.BARTENDRO = {{ {"status": status, "metric": opts.metric} | tojson }};</script>
+<script src="/static/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

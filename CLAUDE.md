@@ -19,8 +19,11 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 2. **Database** - done 2026-10-01: SQLAlchemy 2 + Alembic on SQLite, importer for old
    `bartendro.db` files (checked against `ui/bartendro.db.default`), per-bot TOML config,
    `bartendro-db` CLI. Still to do: import Kevin's real `bartendro.db` files from the bots' SD cards.
-3. Web app: FastAPI (or Flask 3) + htmx, phone-first (small bots have no screen), WebSocket
-   pour status; port the state machine `ui/bartendro/fsm.py` + `mixer.py` logic.
+3. **Web app** - first version done 2026-10-01, tested with the simulator only: FastAPI +
+   Jinja templates + ~200 lines of plain JS (no htmx: the hotspot has no internet to fetch it),
+   WebSocket pour status to every screen. No login (Kevin's call): anyone on the bot's WiFi
+   can use admin. Kiosk on localhost + phones at the same time. Not done yet: old-db upload in
+   the UI, liquid-level calibration page, "feeling lucky" / shotbot UI / turbo options.
 4. Cocktail recipe database: ingredients separate from brands, pumpable vs. manual steps,
    units -> ml, "what can I make now". Check licences before bundling any dataset
    (TheCocktailDB data must not be redistributed; IBA list is a candidate seed).
@@ -37,6 +40,11 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
   `db/importer.py` (old bartendro.db -> new, read-only, keeps ids), `db/options.py` (typed
   settings, password hashed), `db/menu.py` (what can be made; parts -> ml with strength/tartness).
   Recipes are in parts, scaled to the glass size at pour time, like the old app.
+- `bot.py` - port of mixer.py + fsm.py: one action at a time (BusyError), drink -> dispenser
+  plan, shots, test dispense, pump runs, clean, levels, CURRENT_SENSE / ERROR states + reset.
+  `background=True` runs the pumping in a thread; listeners get status/pour events.
+- `web/` - `create_app(bot)` (routes, JSON API under /api, WebSocket /ws), `server.py`
+  (`bartendro-web [--sim N]`, port 8080), `templates/`, `static/` (style.css, app.js).
 - `config.py` - per-bot TOML (`docs/bartendro.example.toml`): ports, dispensers, db path, screen.
 - Schema change: edit models.py, then `bartendro-db --db scratch.db revision -m "..."`, review
   the generated file; `tests/test_db.py::test_migrations_match_models` fails until you do.

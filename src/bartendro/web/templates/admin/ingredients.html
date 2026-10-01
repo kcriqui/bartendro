@@ -1,0 +1,19 @@
+{% extends "admin/layout.html" %}
+{% set tab = "ingredients" %}
+{% block title %}Ingredients - {{ bot_name }}{% endblock %}
+{% block admin %}
+<p><a class="btn primary" href="/admin/ingredient/new">New ingredient</a></p>
+<table class="grid">
+  <tr><th>Ingredient</th><th>Kind</th><th>ABV</th><th>Brand of</th></tr>
+  {% for i in ingredients %}
+  <tr>
+    <td><a href="/admin/ingredient/{{ i.id }}">{{ i.name }}</a>
+      {% if i.manual %}<span class="muted">by hand</span>{% endif %}
+      {% if i.id not in used %}<span class="muted">unused</span>{% endif %}</td>
+    <td>{{ i.kind.value }}</td>
+    <td class="num">{{ "%g" % i.abv }}%</td>
+    <td>{{ i.generic.name if i.generic else "" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

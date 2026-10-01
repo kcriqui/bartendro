@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block body_class %}admin{% endblock %}
+{% block content %}
+<nav class="tabs">
+  <a href="/admin" class="{{ 'on' if tab == 'dispensers' }}">Dispensers</a>
+  <a href="/admin/drinks" class="{{ 'on' if tab == 'drinks' }}">Drinks</a>
+  <a href="/admin/ingredients" class="{{ 'on' if tab == 'ingredients' }}">Ingredients</a>
+  <a href="/admin/options" class="{{ 'on' if tab == 'options' }}">Options</a>
+  <a href="/admin/log" class="{{ 'on' if tab == 'log' }}">Log</a>
+</nav>
+{% block admin %}{% endblock %}
+<p class="footer">Bartendro {{ version }}</p>
+{% endblock %}
