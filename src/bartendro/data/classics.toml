@@ -1,7 +1,11 @@
 # Bundled drinks for Bartendro: `bartendro-db load-recipes` (or Admin > Drinks) adds them.
 #
-# Only drinks a bot can make on its own: a ratio of liquids poured straight into a glass of ice.
-# Nothing shaken, stirred and strained, muddled, blended or dashed.
+# The bot pours the liquids; the guest may finish the drink. Two kinds of drinks:
+#   - poured straight into a glass of ice: no `finish`
+#   - poured into a shaker or mixing glass, then shaken or stirred by the guest: `finish`
+#     says what to do after the pour.
+# Small hand-added amounts (a dash of bitters, a dash of absinthe) use the units dash, drop,
+# barspoon, pinch or splash: the pumps skip them and the guest is reminded after the pour.
 #
 # Ingredient amounts are facts (classic and IBA specs, written in ml); the descriptions and
 # instructions were written for this project. GPL-2.0 like the rest of the code.
@@ -11,7 +15,10 @@
 #            database, e.g. names from an old bartendro.db), so nothing is duplicated.
 #   brands:  specific bottles that can stand in for it; an existing ingredient with one of
 #            these names is linked to it (Kahlua -> Coffee Liqueur) unless it already has a link.
-# [[drink]]: ingredients = [[amount, unit, ingredient], ...]; units ml, cl or oz.
+#   manual:  never on a pump (bitters, sauces).
+# [[drink]]: ingredients = [[amount, unit, ingredient], ...]; pumped units ml, cl or oz.
+#   instructions: what to put under the spout ("Over ice.", "Pour into a shaker.")
+#   finish: what the guest does after the pour
 
 # ------------------------------------------------------------------ spirits
 [[ingredient]]
@@ -50,6 +57,12 @@ kind = "alcohol"
 abv = 40
 aliases = ["Whisky"]
 brands = ["Bourbon", "Rye Whiskey", "Jack Daniel's", "Jameson", "Scotch Whisky"]
+
+[[ingredient]]
+name = "Rye Whiskey"
+kind = "alcohol"
+abv = 45
+aliases = ["Rye"]
 
 [[ingredient]]
 name = "Scotch Whisky"
@@ -103,6 +116,18 @@ name = "Sweet Vermouth"
 kind = "alcohol"
 abv = 16
 aliases = ["Vermouth, Sweet", "Red Vermouth", "Rosso Vermouth"]
+
+[[ingredient]]
+name = "Dry Vermouth"
+kind = "alcohol"
+abv = 18
+aliases = ["Vermouth, Dry", "French Vermouth"]
+
+[[ingredient]]
+name = "Lillet Blanc"
+kind = "alcohol"
+abv = 17
+aliases = ["Lillet"]
 
 [[ingredient]]
 name = "Drambuie"
@@ -162,6 +187,15 @@ kind = "sweet"
 aliases = ["Sugar Syrup"]
 
 [[ingredient]]
+name = "Agave Syrup"
+kind = "sweet"
+aliases = ["Agave Nectar"]
+
+[[ingredient]]
+name = "Tomato Juice"
+kind = "other"
+
+[[ingredient]]
 name = "Cream"
 kind = "other"
 aliases = ["Heavy Cream", "Fresh Cream"]
@@ -194,6 +228,40 @@ aliases = ["Club Soda", "Sparkling Water", "Seltzer"]
 name = "Grapefruit Soda"
 kind = "sweet"
 brands = ["Squirt", "Jarritos Toronja"]
+
+# ------------------------------------------------------------------ by hand
+[[ingredient]]
+name = "Angostura Bitters"
+kind = "other"
+abv = 45
+manual = true
+aliases = ["Bitters, Angostura", "Angostura", "Aromatic Bitters"]
+
+[[ingredient]]
+name = "Peychaud's Bitters"
+kind = "other"
+abv = 35
+manual = true
+aliases = ["Peychauds Bitters", "Peychaud's"]
+
+[[ingredient]]
+name = "Absinthe"
+kind = "other"
+abv = 60
+manual = true
+aliases = ["Herbsaint", "Pastis"]
+
+[[ingredient]]
+name = "Worcestershire Sauce"
+kind = "other"
+manual = true
+aliases = ["Worcestershire"]
+
+[[ingredient]]
+name = "Hot Sauce"
+kind = "other"
+manual = true
+aliases = ["Tabasco"]
 
 # ================================================================== drinks
 
@@ -454,3 +522,147 @@ instructions = "Over ice."
 ingredients = [[15, "ml", "Vodka"], [15, "ml", "Tequila"], [15, "ml", "White Rum"], [15, "ml", "Gin"],
                [15, "ml", "Triple Sec"], [25, "ml", "Lemon Juice"], [30, "ml", "Simple Syrup"],
                [30, "ml", "Cola"]]
+
+# ------------------------------------------------------------------ the guest adds a dash
+
+[[drink]]
+name = "Old Fashioned"
+glass = "old fashioned"
+popular = true
+description = "Whiskey, a little sugar and aromatic bitters."
+instructions = "Over ice."
+finish = "Add the bitters and stir a few times. An orange peel if you have one."
+ingredients = [[45, "ml", "Whiskey"], [7.5, "ml", "Simple Syrup"], [2, "dash", "Angostura Bitters"]]
+
+[[drink]]
+name = "Bloody Mary"
+glass = "highball"
+description = "Vodka and tomato juice with lemon, Worcestershire and heat."
+instructions = "Over ice."
+finish = "Add the sauces and a pinch each of salt and pepper, stir gently. A celery stalk if you have one."
+ingredients = [[45, "ml", "Vodka"], [90, "ml", "Tomato Juice"], [15, "ml", "Lemon Juice"],
+               [2, "dash", "Worcestershire Sauce"], [2, "dash", "Hot Sauce"]]
+
+# ------------------------------------------------------------------ the guest shakes it
+
+[[drink]]
+name = "Margarita"
+glass = "margarita or coupe"
+popular = true
+description = "Tequila, orange liqueur and lime."
+instructions = "Pour into a shaker."
+finish = "Shake hard with ice and strain into a chilled glass (salt the rim first if you like)."
+ingredients = [[50, "ml", "Tequila"], [20, "ml", "Triple Sec"], [15, "ml", "Lime Juice"]]
+
+[[drink]]
+name = "Tommy's Margarita"
+glass = "old fashioned"
+description = "Tequila, lime and agave - no orange liqueur."
+instructions = "Pour into a shaker."
+finish = "Shake hard with ice and strain over fresh ice."
+ingredients = [[60, "ml", "Tequila"], [30, "ml", "Lime Juice"], [15, "ml", "Agave Syrup"]]
+
+[[drink]]
+name = "Daiquiri"
+glass = "coupe"
+popular = true
+description = "Rum, lime and sugar. The real one, not the frozen kind."
+instructions = "Pour into a shaker."
+finish = "Shake hard with ice and strain into a chilled glass."
+ingredients = [[60, "ml", "White Rum"], [20, "ml", "Lime Juice"], [10, "ml", "Simple Syrup"]]
+
+[[drink]]
+name = "Cosmopolitan"
+glass = "cocktail"
+popular = true
+description = "Vodka, orange liqueur, lime and cranberry."
+instructions = "Pour into a shaker."
+finish = "Shake with ice and strain into a chilled glass. A lime or orange twist if you have one."
+ingredients = [[40, "ml", "Vodka"], [15, "ml", "Triple Sec"], [15, "ml", "Lime Juice"],
+               [30, "ml", "Cranberry Juice"]]
+
+[[drink]]
+name = "Kamikaze"
+glass = "cocktail"
+description = "Vodka, orange liqueur and lime in equal parts."
+instructions = "Pour into a shaker."
+finish = "Shake with ice and strain into a chilled glass."
+ingredients = [[30, "ml", "Vodka"], [30, "ml", "Triple Sec"], [30, "ml", "Lime Juice"]]
+
+[[drink]]
+name = "Gimlet"
+glass = "coupe"
+description = "Gin, lime and sugar."
+instructions = "Pour into a shaker."
+finish = "Shake with ice and strain into a chilled glass."
+ingredients = [[60, "ml", "Gin"], [15, "ml", "Lime Juice"], [15, "ml", "Simple Syrup"]]
+
+[[drink]]
+name = "Whiskey Sour"
+glass = "old fashioned"
+popular = true
+description = "Whiskey, lemon and sugar."
+instructions = "Pour into a shaker."
+finish = "Shake hard with ice and strain over fresh ice. Shake an egg white in first for a foamy top."
+ingredients = [[45, "ml", "Whiskey"], [25, "ml", "Lemon Juice"], [20, "ml", "Simple Syrup"]]
+
+[[drink]]
+name = "Amaretto Sour"
+glass = "old fashioned"
+description = "Amaretto, lemon and a little sugar."
+instructions = "Pour into a shaker."
+finish = "Shake with ice and strain over fresh ice."
+ingredients = [[45, "ml", "Amaretto"], [30, "ml", "Lemon Juice"], [10, "ml", "Simple Syrup"]]
+
+[[drink]]
+name = "Sidecar"
+glass = "coupe"
+description = "Brandy, orange liqueur and lemon."
+instructions = "Pour into a shaker."
+finish = "Shake with ice and strain into a chilled glass (sugar the rim first if you like)."
+ingredients = [[50, "ml", "Brandy"], [20, "ml", "Triple Sec"], [20, "ml", "Lemon Juice"]]
+
+[[drink]]
+name = "Corpse Reviver No. 2"
+glass = "coupe"
+description = "Gin, orange liqueur, Lillet and lemon in equal parts, with a whisper of absinthe."
+instructions = "Pour into a shaker."
+finish = "Add the absinthe, shake with ice and strain into a chilled glass."
+ingredients = [[30, "ml", "Gin"], [30, "ml", "Triple Sec"], [30, "ml", "Lillet Blanc"],
+               [30, "ml", "Lemon Juice"], [1, "dash", "Absinthe"]]
+
+# ------------------------------------------------------------------ the guest stirs it
+
+[[drink]]
+name = "Manhattan"
+glass = "coupe"
+popular = true
+description = "Whiskey, sweet vermouth and bitters."
+instructions = "Pour into a mixing glass."
+finish = "Add the bitters, stir with ice and strain into a chilled glass. A cherry if you have one."
+ingredients = [[50, "ml", "Whiskey"], [20, "ml", "Sweet Vermouth"], [1, "dash", "Angostura Bitters"]]
+
+[[drink]]
+name = "Dry Martini"
+glass = "cocktail"
+description = "Gin with a little dry vermouth."
+instructions = "Pour into a mixing glass."
+finish = "Stir with ice and strain into a chilled glass. An olive or a lemon twist."
+ingredients = [[60, "ml", "Gin"], [10, "ml", "Dry Vermouth"]]
+
+[[drink]]
+name = "Boulevardier"
+glass = "old fashioned"
+description = "A Negroni with whiskey instead of gin."
+instructions = "Pour into a mixing glass."
+finish = "Stir with ice and strain into a chilled glass (or over a big ice cube)."
+ingredients = [[45, "ml", "Whiskey"], [30, "ml", "Campari"], [30, "ml", "Sweet Vermouth"]]
+
+[[drink]]
+name = "Sazerac"
+glass = "old fashioned"
+description = "Rye, sugar and Peychaud's bitters in an absinthe-rinsed glass. New Orleans' own."
+instructions = "Pour into a mixing glass."
+finish = "Swirl the absinthe around a chilled glass and pour it out. Add the bitters to the mixing glass, stir with ice and strain into the rinsed glass. Lemon peel over the top."
+ingredients = [[60, "ml", "Rye Whiskey"], [7.5, "ml", "Simple Syrup"], [3, "dash", "Peychaud's Bitters"],
+               [1, "dash", "Absinthe"]]

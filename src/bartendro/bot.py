@@ -78,13 +78,26 @@ class CantPourError(BotError):
 
 
 @dataclass
+class HandStep:
+    """Something the guest adds after the pour: a manual ingredient's share of the mix (ml) or a
+    hand-added amount like "2 dashes" (text)."""
+    ingredient: str
+    ml: float | None = None
+    text: str = ""
+
+    def as_list(self) -> list:
+        return [self.ingredient, None if self.ml is None else round(self.ml), self.text]
+
+
+@dataclass
 class Plan:
     """What pouring one drink means: ml per dispenser number, and what to add by hand."""
     drink_id: int | None
     name: str
     size_ml: float
     pumps: dict[int, float]  # dispenser number -> ml
-    manual: list[tuple[str, float]] = field(default_factory=list)  # (ingredient, ml) to add by hand
+    manual: list[HandStep] = field(default_factory=list)  # added by the guest after the pour
+    finish: str = ""  # e.g. "Shake with ice and strain."
 
     @property
     def pumped_ml(self) -> float:
@@ -163,12 +176,15 @@ class Bot:
                 raise CantPourError(f"drink size must be {MIN_DRINK_ML}-{MAX_DISPENSE_ML} ml")
             amounts = scale_recipe(drink, size, strength, tartness, include_manual=True)
             if not amounts:
-                raise CantPourError(f"{drink.name} has no ingredients")
-            plan = Plan(drink.id, drink.name, size, {})
+                raise CantPourError(f"{drink.name} has nothing for the pumps to pour")
+            plan = Plan(drink.id, drink.name, size, {}, finish=drink.finish)
             for item in drink.items:
+                if item.by_hand:
+                    plan.manual.append(HandStep(item.ingredient.name, text=item.hand_text))
+                    continue
                 ml = amounts[item.ingredient_id]
                 if item.ingredient.manual:
-                    plan.manual.append((item.ingredient.name, ml))
+                    plan.manual.append(HandStep(item.ingredient.name, ml))
                     continue
                 number = self._dispenser_for(s, item.ingredient)
                 plan.pumps[number] = plan.pumps.get(number, 0) + ml
@@ -293,7 +309,7 @@ class Bot:
         self.current = plan
         self._set_state(State.POURING, plan.name)
         self._emit({"type": "pouring", "name": plan.name, "ml": round(plan.pumped_ml),
-                    "manual": [[n, round(ml)] for n, ml in plan.manual]})
+                    "manual": [h.as_list() for h in plan.manual], "finish": plan.finish})
         with self.sessions() as s:
             cal = {n - 1: d.ticks_per_ml for n in plan.pumps
                    if (d := s.get(Dispenser, n)) is not None and d.ticks_per_ml}
@@ -314,7 +330,7 @@ class Bot:
                               size_ml=plan.pumped_ml))
                 s.commit()
         self._emit({"type": "done", "name": plan.name,
-                    "manual": [[n, round(ml)] for n, ml in plan.manual]})
+                    "manual": [h.as_list() for h in plan.manual], "finish": plan.finish})
         self._check()
 
     def _reset(self) -> None:

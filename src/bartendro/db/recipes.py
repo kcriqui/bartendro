@@ -16,10 +16,11 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Drink, Ingredient, Kind, RecipeItem
+from .models import HAND_UNITS, Drink, Ingredient, Kind, RecipeItem
 
 SOURCE = "classics"
-UNITS_ML = {"ml": 1.0, "cl": 10.0, "oz": 29.57}
+UNITS_ML = {"ml": 1.0, "cl": 10.0, "oz": 29.57}  # poured by the pumps
+# HAND_UNITS (dash, drop, barspoon, pinch, splash): added by the guest after the pour
 
 
 class RecipeFileError(Exception):
@@ -65,12 +66,35 @@ def _validate(data: dict, p: Path) -> None:
             if len(item) != 3:
                 raise RecipeFileError(f"{p}: {d['name']}: ingredients are [amount, unit, name]")
             amount, unit, name = item
-            if unit not in UNITS_ML:
-                raise RecipeFileError(f"{p}: {d['name']}: unit {unit!r} (use {', '.join(UNITS_ML)})")
+            if unit not in UNITS_ML and unit not in HAND_UNITS:
+                raise RecipeFileError(f"{p}: {d['name']}: unit {unit!r} "
+                                      f"(use {', '.join([*UNITS_ML, *HAND_UNITS])})")
             if not isinstance(amount, (int, float)) or amount <= 0:
                 raise RecipeFileError(f"{p}: {d['name']}: bad amount {amount!r}")
             if name.lower() not in names:
                 raise RecipeFileError(f"{p}: {d['name']}: {name!r} is not an [[ingredient]]")
+        if not any(unit in UNITS_ML for _, unit, _ in d["ingredients"]):
+            raise RecipeFileError(f"{p}: {d['name']}: nothing for the pumps to pour")
+
+
+def parse_amount(text: str) -> tuple[float | None, float | None, str]:
+    """Admin form entry -> (parts, amount, unit): "2" is 2 parts, "30 ml" / "1 oz" are parts in
+    ml, "2 dash" (dash, drop, barspoon, pinch, splash; plurals ok) is added by hand."""
+    words = text.strip().lower().split()
+    if not words or len(words) > 2:
+        raise ValueError(f"amount {text!r}: a number, optionally with a unit")
+    amount = float(words[0])
+    if amount <= 0:
+        raise ValueError(f"amount {text!r} must be more than 0")
+    if len(words) == 1:
+        return amount, None, ""
+    unit = words[1]
+    singular = {v: k for k, v in HAND_UNITS.items()}.get(unit, unit)
+    if singular in HAND_UNITS:
+        return None, amount, singular
+    if unit in UNITS_ML:
+        return amount * UNITS_ML[unit], amount, unit
+    raise ValueError(f"unit {unit!r}: use ml, cl, oz or {', '.join(HAND_UNITS)}")
 
 
 def _norm(name: str) -> str:
@@ -96,7 +120,7 @@ def load(session: Session, path: str | Path | None = None, update: bool = False)
                 report.notes.append(f"using your {found.name!r} for {spec['name']!r}")
         else:
             found = Ingredient(name=spec["name"], kind=Kind(spec.get("kind", "other")),
-                               abv=float(spec.get("abv", 0)), manual=False)
+                               abv=float(spec.get("abv", 0)), manual=bool(spec.get("manual", False)))
             session.add(found)
             by_name[_norm(found.name)] = found
             report.counts["ingredients added"] += 1
@@ -130,13 +154,15 @@ def load(session: Session, path: str | Path | None = None, update: bool = False)
             report.counts["drinks updated"] += 1
         drink.description = spec.get("description", "")
         drink.instructions = spec.get("instructions", "")
+        drink.finish = spec.get("finish", "")
         drink.glass = spec.get("glass", "")
         # Pour the recipe as specified (a Godmother is 70 ml, not the default 150 ml glass);
         # the size buttons still scale it.
-        drink.size_ml = round(sum(a * UNITS_ML[u] for a, u, _ in spec["ingredients"]))
+        drink.size_ml = round(sum(a * UNITS_ML[u] for a, u, _ in spec["ingredients"] if u in UNITS_ML))
         drink.items.clear()
         session.flush()  # delete the old rows first: (drink, ingredient) is unique
-        drink.items = [RecipeItem(ingredient=resolved[_norm(name)], parts=amount * UNITS_ML[unit],
+        drink.items = [RecipeItem(ingredient=resolved[_norm(name)],
+                                  parts=amount * UNITS_ML[unit] if unit in UNITS_ML else None,
                                   amount=float(amount), unit=unit, position=n)
                        for n, (amount, unit, name) in enumerate(spec["ingredients"])]
     session.commit()

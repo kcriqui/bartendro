@@ -24,13 +24,16 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    WebSocket pour status to every screen. No login (Kevin's call): anyone on the bot's WiFi
    can use admin. Kiosk on localhost + phones at the same time. Not done yet: old-db upload in
    the UI, liquid-level calibration page, "feeling lucky" / shotbot UI / turbo options.
-4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 35 drinks
+4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 51 drinks
    written for this project (amounts are facts from classic/IBA specs; no copied text - the
    GitHub IBA datasets are scrapes of IBA's site + Wikipedia, so not bundled; TheCocktailDB must
-   not be redistributed). **Kevin's rule: only drinks that are a ratio of liquids poured over
-   ice - nothing shaken, stirred, muddled, blended or dashed.** Loader matches existing
-   ingredients by name/alias and links brands (Kahlua -> Coffee Liqueur); classic drinks pour
-   their recipe total (size_ml). "One bottle away" + `suggest N` bottle planner.
+   not be redistributed). **Kevin's rule: the bot only pours liquids. Drinks are either poured
+   over ice, or poured into a shaker/mixing glass and finished by the guest (`finish`); small
+   amounts like dashes of bitters or absinthe are hand-added recipe lines (parts NULL, unit
+   dash/drop/barspoon/pinch/splash) shown as a reminder after the pour. Nothing muddled or
+   blended.** Loader matches existing ingredients by name/alias and links brands (Kahlua ->
+   Coffee Liqueur); classic drinks pour their recipe total (size_ml). "One bottle away" +
+   `suggest N` bottle planner.
 5. Install script / systemd service, NetworkManager hotspot, optional Chromium kiosk.
 
 ## Layout

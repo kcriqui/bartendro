@@ -14,7 +14,8 @@ STRENGTH_STEP = 0.25  # each strength/tartness step changes those ingredients by
 def available_ingredients(session: Session, dispenser_count: int | None = None) -> set[int]:
     """Ids of ingredients the bot can use now: what's on the dispensers (only the first
     `dispenser_count` if given, skipping empty ones when the level sensors are on), the generic
-    ingredients those belong to, and every manual (added by hand) ingredient.
+    ingredients those belong to, and every manual (added by hand) ingredient. Hand-added
+    recipe lines (a dash of bitters) never count against a drink: the guest adds those.
     Port of mixer.get_available_drink_list's booze list."""
     q = select(Dispenser).where(Dispenser.ingredient_id.is_not(None))
     if dispenser_count is not None:
@@ -41,7 +42,8 @@ def makeable_drinks(session: Session, dispenser_count: int | None = None,
     if enabled_only:
         q = q.where(Drink.enabled)
     drinks = [d for d in session.scalars(q)
-              if d.items and all(i.ingredient_id in have for i in d.items)]
+              if any(not i.by_hand for i in d.items)
+              and all(i.ingredient_id in have for i in d.items if not i.by_hand)]
     return sorted(drinks, key=lambda d: (d.sort_name or d.name).lower())
 
 
@@ -54,6 +56,8 @@ def scale_recipe(drink: Drink, size_ml: float, strength: int = 0, tartness: int 
     `include_manual`, since the pumps don't pour them."""
     adjusted, manual = {}, set()
     for item in drink.items:
+        if item.by_hand:  # a dash of bitters: not part of the mix
+            continue
         kind = item.ingredient.kind
         step = {Kind.ALCOHOL: strength, Kind.TART: tartness, Kind.SWEET: -tartness}.get(kind, 0)
         adjusted[item.ingredient_id] = max(item.parts * (1 + STRENGTH_STEP * step), 0.0)
@@ -71,8 +75,8 @@ def _needs(session: Session, enabled_only: bool = True) -> dict[int, set[int]]:
     q = select(Drink).options(selectinload(Drink.items).selectinload(RecipeItem.ingredient))
     if enabled_only:
         q = q.where(Drink.enabled)
-    return {d.id: {i.ingredient_id for i in d.items if not i.ingredient.manual}
-            for d in session.scalars(q) if d.items}
+    return {d.id: needs for d in session.scalars(q)
+            if (needs := {i.ingredient_id for i in d.items if not i.by_hand and not i.ingredient.manual})}
 
 
 def one_bottle_away(session: Session, dispenser_count: int | None = None,

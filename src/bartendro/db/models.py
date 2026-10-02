@@ -89,7 +89,8 @@ class Drink(Base):
     popular: Mapped[bool] = mapped_column(Boolean, default=False)  # old "the essentials" section
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)   # listed on the menu (old "available")
     size_ml: Mapped[int | None] = mapped_column(Integer)  # per-drink glass size; None = option drink_size
-    instructions: Mapped[str] = mapped_column(Text, default="")  # e.g. "Shake with ice, strain."
+    instructions: Mapped[str] = mapped_column(Text, default="")  # how it's served, e.g. "Over ice."
+    finish: Mapped[str] = mapped_column(Text, default="")  # what the guest does after the pour, e.g. "Shake with ice and strain."
     glass: Mapped[str] = mapped_column(String(50), default="")
     source: Mapped[str] = mapped_column(String(50), default="")  # "legacy" (old db), "classics" (bundled), ""
 
@@ -102,22 +103,45 @@ class Drink(Base):
 
 class RecipeItem(Base):
     __tablename__ = "recipe_item"
-    """One ingredient of a drink: its share of the mix (`parts`). Recipes from the bundled
-    cocktail file use ml as parts and keep the amount as written (`amount` + `unit`, e.g. 2 oz)."""
+    """One ingredient of a drink: its share of the mix (`parts`; recipes from the bundled file
+    use ml as parts and keep the amount as written in `amount` + `unit`, e.g. 2 oz), or, with
+    parts None, a small amount the guest adds by hand after the pour ("2 dash" of bitters):
+    never pumped, not part of the mix, shown as a reminder."""
     __tablename__ = "recipe_item"
     __table_args__ = (UniqueConstraint("drink_id", "ingredient_id"),
-                      CheckConstraint("parts > 0", name="parts_positive"))
+                      CheckConstraint("parts IS NULL OR parts > 0", name="parts_positive"))
 
     id: Mapped[int] = mapped_column(primary_key=True)
     drink_id: Mapped[int] = mapped_column(ForeignKey("drink.id", ondelete="CASCADE"), index=True)
     ingredient_id: Mapped[int] = mapped_column(ForeignKey("ingredient.id"))
-    parts: Mapped[float] = mapped_column(Float)
+    parts: Mapped[float | None] = mapped_column(Float)
     amount: Mapped[float | None] = mapped_column(Float)
     unit: Mapped[str] = mapped_column(String(20), default="")
     position: Mapped[int] = mapped_column(Integer, default=0)
 
     drink: Mapped[Drink] = relationship(back_populates="items")
     ingredient: Mapped[Ingredient] = relationship()
+
+    @property
+    def by_hand(self) -> bool:
+        """Added by the guest after the pour (a dash of bitters), not by the pumps."""
+        return self.parts is None
+
+    @property
+    def hand_text(self) -> str:
+        """"3 dashes", "1 barspoon" - how much to add by hand."""
+        return amount_text(self.amount, self.unit)
+
+
+HAND_UNITS = {"dash": "dashes", "drop": "drops", "barspoon": "barspoons", "pinch": "pinches",
+              "splash": "splashes"}
+
+
+def amount_text(amount: float | None, unit: str) -> str:
+    if amount is None:
+        return unit
+    n = f"{amount:g}"
+    return f"{n} {unit if amount == 1 else HAND_UNITS.get(unit, unit)}"
 
 
 class Dispenser(Base):

@@ -34,7 +34,8 @@ src/bartendro/db -- SQLite database (SQLAlchemy + Alembic migrations), importer 
                     bartendro.db files; `bartendro-db`: upgrade, import, show, set-password
 src/bartendro/config.py -- per-bot settings file (docs/bartendro.example.toml)
 src/bartendro/bot.py -- the drink-making logic (port of the old mixer and state machine)
-src/bartendro/data/classics.toml -- bundled drinks (poured over ice, no shaking):
+src/bartendro/data/classics.toml -- bundled drinks (the bot pours; the guest adds dashes and
+                     shakes or stirs where needed):
                      `bartendro-db load-recipes`, `bartendro-db suggest 3` (plan a small bot)
 src/bartendro/web -- web app (FastAPI): menu, shots, admin, live pour status;
                      `bartendro-web --sim 15` runs it on a PC with simulated pumps

@@ -113,8 +113,26 @@ def test_manual_ingredients_are_listed_not_pumped(sessions):
                                                  RecipeItem(ingredient=mint, parts=1, position=1)]))
         s.commit()
     plan = b.make_drink(501, size_ml=100)
-    assert plan.pumps == pytest.approx({1: 75}) and plan.manual == [("Mint", 25)]
-    assert b.events[-2]["manual"] == [["Mint", 25]]
+    assert plan.pumps == pytest.approx({1: 75})
+    assert [(h.ingredient, h.ml, h.text) for h in plan.manual] == [("Mint", 25, "")]
+    assert b.events[-2]["manual"] == [["Mint", 25, ""]]
+
+
+def test_hand_added_dashes_and_finish(sessions):
+    b, bus = make_bot(sessions)
+    with sessions() as s:
+        bitters = Ingredient(name="Angostura", manual=True)  # not on any dispenser
+        whiskey = s.scalar(select(Ingredient).where(Ingredient.name == "Whiskey"))  # dispenser #15
+        s.add(Drink(id=502, name="Old Fashioned", finish="Stir.", size_ml=45, items=[
+            RecipeItem(ingredient=whiskey, parts=45, position=0),
+            RecipeItem(ingredient=bitters, parts=None, amount=2, unit="dash", position=1)]))
+        s.commit()
+    plan = b.make_drink(502)
+    assert plan.pumps == pytest.approx({15: 45})  # the dashes don't dilute the mix
+    assert [(h.ingredient, h.ml, h.text) for h in plan.manual] == [("Angostura", None, "2 dashes")]
+    done = b.events[-2]
+    assert done["type"] == "done" and done["manual"] == [["Angostura", None, "2 dashes"]]
+    assert done["finish"] == "Stir."
 
 
 def test_busy(sessions, monkeypatch):

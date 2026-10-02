@@ -212,17 +212,26 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
             drink.size_ml = int(size) if size else None
             drink.popular = bool(form.get("popular"))
             drink.enabled = bool(form.get("enabled"))
-            parts: dict[int, float] = {}
-            for ing, amount in zip(form.getlist("ingredient"), form.getlist("parts")):
-                if ing and str(amount).strip():
-                    p = float(amount)
-                    if p > 0:
-                        parts[int(ing)] = parts.get(int(ing), 0) + p
+            drink.glass = str(form.get("glass", "")).strip()
+            drink.instructions = str(form.get("instructions", "")).strip()
+            drink.finish = str(form.get("finish", "")).strip()
+            rows: dict[int, tuple] = {}
+            for ing, text in zip(form.getlist("ingredient"), form.getlist("parts")):
+                if not ing or not str(text).strip():
+                    continue
+                try:
+                    parts, amount, unit = recipes.parse_amount(str(text))
+                except ValueError as e:
+                    return JSONResponse({"error": str(e)}, status_code=400)
+                old = rows.get(int(ing))
+                if old and old[0] is not None and parts is not None:  # listed twice: add up
+                    parts, amount, unit = old[0] + parts, None, ""
+                rows[int(ing)] = (parts, amount, unit)
             s.add(drink)
             drink.items.clear()
             s.flush()  # delete the old rows first: (drink, ingredient) is unique
-            drink.items = [RecipeItem(ingredient_id=i, parts=p, position=n)  # edited: no "as written" amount
-                           for n, (i, p) in enumerate(parts.items())]
+            drink.items = [RecipeItem(ingredient_id=i, parts=p, amount=a, unit=u, position=n)
+                           for n, (i, (p, a, u)) in enumerate(rows.items())]
             s.add(drink)
             s.commit()
         return RedirectResponse("/admin/drinks", status_code=303)
@@ -340,7 +349,9 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
         return {"name": plan.name, "size_ml": plan.size_ml,
                 "pumps": [{"dispenser": n, "ingredient": names.get(n, "?"), "ml": round(ml, 1)}
                           for n, ml in sorted(plan.pumps.items())],
-                "manual": [{"ingredient": n, "ml": round(ml, 1)} for n, ml in plan.manual]}
+                "manual": [{"ingredient": h.ingredient, "ml": None if h.ml is None else round(h.ml, 1),
+                            "text": h.text} for h in plan.manual],
+                "finish": plan.finish}
 
     @app.post("/api/drink/{drink_id}/make", status_code=202)
     def api_make(drink_id: int, req: MakeRequest):

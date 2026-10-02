@@ -9,6 +9,7 @@
   <p class="serve">{% if drink.glass %}<span class="glass">{{ drink.glass }} glass</span>{% endif %}
     {{ drink.instructions }}</p>
   {% endif %}
+  {% if drink.finish %}<p class="serve"><b>Then:</b> {{ drink.finish }}</p>{% endif %}
 
   <table class="recipe" id="recipe">
     {% for item in drink.items %}

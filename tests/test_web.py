@@ -194,3 +194,27 @@ def test_admin_options(env):
         assert options.get(s, "shot_size") == 30       # bad value ignored
         assert options.get(s, "show_size") is False    # unticked box
     assert "Taster (30 ml)" in client.get(f"/drink/{black_russian(sessions)}").text  # metric now
+
+
+def test_hand_added_amounts_in_admin_and_plan(env):
+    client, b, _, sessions = env
+    client.post("/admin/recipes/load")
+    with sessions() as s:
+        manhattan = s.scalar(select(Drink).where(Drink.name == "Manhattan")).id
+    form = client.get(f"/admin/drink/{manhattan}").text
+    assert 'value="1 dash"' in form and "stir with ice" in form
+    r = client.post(f"/admin/drink/{manhattan}", data={
+        "name": "Manhattan", "enabled": "on", "finish": "Stir.", "size_ml": "50",
+        "ingredient": ["7", "1"], "parts": ["50 ml", "3 dashes"]}, follow_redirects=False)  # Whiskey, Vodka
+    assert r.status_code == 303
+    with sessions() as s:
+        d = s.get(Drink, manhattan)
+        assert d.finish == "Stir."
+        assert [(i.ingredient_id, i.parts, i.hand_text) for i in d.items] == \
+            [(7, 50, "50 ml"), (1, None, "3 dashes")]
+    plan = client.get(f"/api/drink/{manhattan}/plan").json()
+    assert plan["pumps"] == [{"dispenser": 15, "ingredient": "Whiskey", "ml": 50}]
+    assert plan["manual"] == [{"ingredient": "Vodka", "ml": None, "text": "3 dashes"}]
+    assert plan["finish"] == "Stir."
+    assert client.post(f"/admin/drink/{manhattan}", data={
+        "name": "Manhattan", "ingredient": ["7"], "parts": ["2 pints"]}).status_code == 400

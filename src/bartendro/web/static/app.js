@@ -29,14 +29,15 @@ const Bartendro = (() => {
     const o = $("#overlay");
     $("#overlay-title").textContent = title;
     $("#overlay-text").textContent = text;
+    $("#overlay-finish").textContent = "";
     $("#overlay-spinner").hidden = !spinner;
     $("#overlay-reset").hidden = !reset;
     $("#overlay-close").hidden = !close;
     const ul = $("#overlay-manual");
     ul.innerHTML = "";
-    for (const [name, ml] of manual) {
+    for (const [name, ml, text] of manual) {  // [ingredient, ml or null, "2 dashes" or ""]
       const li = document.createElement("li");
-      li.textContent = `${name}: ${amount(ml)}`;
+      li.textContent = text ? `${text} ${name}` : `${name}: ${amount(ml)}`;
       ul.appendChild(li);
     }
     o.classList.toggle("bad", bad);
@@ -83,9 +84,13 @@ const Bartendro = (() => {
     else if (ev.type === "pouring") overlay({ title: `Pouring ${ev.name}`, text: amount(ev.ml), spinner: true });
     else if (ev.type === "done") {
       const manual = ev.manual || [];
-      overlay({ title: manual.length ? "Almost done!" : "Enjoy!",
-                text: manual.length ? `Now add by hand to your ${ev.name}:` : `Your ${ev.name} is ready.`,
-                manual, close: true, autoHide: manual.length ? 0 : 5000 });
+      const todo = manual.length || ev.finish;
+      let text = `Your ${ev.name} is ready.`;
+      if (manual.length) text = `Now add to your ${ev.name}:`;
+      else if (ev.finish) text = ev.finish;
+      overlay({ title: todo ? "Almost done!" : "Enjoy!", text, manual, close: true,
+                autoHide: todo ? 0 : 5000 });
+      if (manual.length && ev.finish) $("#overlay-finish").textContent = ev.finish;
     }
   }
 
@@ -144,14 +149,14 @@ const Bartendro = (() => {
       $("#make").disabled = false;
       const table = $("#recipe");
       table.innerHTML = "";
-      const rows = data.pumps.map((p) => [p.ingredient, p.ml, ""])
-        .concat(data.manual.map((m) => [m.ingredient, m.ml, " (add by hand)"]));
-      for (const [name, ml, note] of rows) {
+      const rows = data.pumps.map((p) => [p.ingredient, amount(p.ml)])
+        .concat(data.manual.map((m) => [`${m.ingredient} (add after pouring)`, m.text || amount(m.ml)]));
+      for (const [name, qty] of rows) {
         const tr = table.insertRow();
-        tr.insertCell().textContent = name + note;
+        tr.insertCell().textContent = name;
         const td = tr.insertCell();
         td.className = "num";
-        td.textContent = amount(ml);
+        td.textContent = qty;
       }
     }
 

@@ -15,19 +15,26 @@
   <label>Name <input name="name" value="{{ drink.name }}" required></label>
   <label>Sort as <input name="sort_name" value="{{ drink.sort_name or '' }}" placeholder="(name)"></label>
   <label>Description <textarea name="description" rows="3">{{ drink.description or '' }}</textarea></label>
+  <label>Glass <input name="glass" value="{{ drink.glass or '' }}" placeholder="highball, coupe..."></label>
+  <label>Before pouring <input name="instructions" value="{{ drink.instructions or '' }}"
+         placeholder="Over ice. / Pour into a shaker."></label>
+  <label>After pouring (the guest) <textarea name="finish" rows="2"
+         placeholder="Shake with ice and strain into a chilled glass.">{{ drink.finish or '' }}</textarea></label>
   <label>Glass size (ml) <input name="size_ml" class="short" inputmode="numeric" value="{{ drink.size_ml or '' }}"
          placeholder="{{ opts.drink_size }}"></label>
   <label class="check"><input type="checkbox" name="enabled" {% if drink.enabled %}checked{% endif %}> On the menu</label>
   <label class="check"><input type="checkbox" name="popular" {% if drink.popular %}checked{% endif %}> In "the essentials"</label>
 
-  <h3>Ingredients (parts)</h3>
+  <h3>Ingredients</h3>
+  <p class="hint">Amounts are parts of the mix ("2"), or ml / cl / oz ("30 ml"). "2 dash" (also drop,
+    barspoon, pinch, splash) is added by the guest after the pour.</p>
   <table class="grid">
     {% for item in drink.items %}
     <tr><td>{{ ingredient_select(item.ingredient_id) }}</td>
-        <td><input name="parts" class="short" inputmode="decimal" value="{{ '%g' % item.parts }}"></td></tr>
+        <td><input name="parts" class="short" value="{{ item.hand_text if item.by_hand else ('%g' % item.parts) }}"></td></tr>
     {% endfor %}
     {% for _ in range(blank_rows) %}
-    <tr><td>{{ ingredient_select(None) }}</td><td><input name="parts" class="short" inputmode="decimal"></td></tr>
+    <tr><td>{{ ingredient_select(None) }}</td><td><input name="parts" class="short"></td></tr>
     {% endfor %}
   </table>
   <div class="button-row">
