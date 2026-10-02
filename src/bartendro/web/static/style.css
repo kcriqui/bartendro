@@ -173,3 +173,5 @@ input.short { width: 6em; }
   .sections { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
   .sections .btn { min-height: 72px; }
 }
+.demo-banner { background: #fcf8e3; color: #8a6d3b; text-align: center; padding: 6px 12px; font-size: .85em;
+               border-bottom: 1px solid #fbeed5; }

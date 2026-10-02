@@ -90,8 +90,11 @@ class PreviewRequest(BaseModel):
     rows: list[PreviewRow] = []
 
 
-def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = None) -> FastAPI:
-    """`uploads`: folder for party logos (default: "uploads" next to the database)."""
+def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = None,
+               demo: bool = False) -> FastAPI:
+    """`uploads`: folder for party logos (default: "uploads" next to the database).
+    `demo`: pages for the static demo site (scripts/export_site.py): a banner, no live
+    connection, and static/demo.js standing in for the bot."""
     sessions = bot.sessions
     if uploads is None:
         db_file = sessions.kw["bind"].url.database
@@ -139,7 +142,8 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             nav = "admin" if path.startswith("/admin") else "shots" if path.startswith("/shots") else "drinks"
             response = templates.TemplateResponse(request, name, {
                 "bot_name": bot_name, "status": bot.status(), "opts": opts, "amount": amount,
-                "version": __version__, "nav": nav, "party": party, "theme_css": theme_css(party), **ctx})
+                "version": __version__, "nav": nav, "party": party, "theme_css": theme_css(party),
+                "demo": demo, **ctx})
         preview = request.query_params.get("party")
         if preview is not None and preview.isdigit():
             if int(preview):

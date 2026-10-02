@@ -47,6 +47,9 @@ importer for old `bartendro.db` files, per-bot config), a first web app (milesto
 bundled recipe collection with a bottle planner (milestone 4). Next: install scripts (systemd,
 hotspot, kiosk). `ui/` stays until the new code pours correctly on real bots.
 
+Static demo (nothing pours or saves): https://kcriqui.github.io/bartendro/ - built by
+`scripts/export_site.py`, published with `py scripts/export_site.py --publish` (gh-pages branch).
+
     pip install -e ".[dev]" && pytest
     bartendro-hw --sim 15 discover
     bartendro-db --db demo.db import ui/bartendro.db.default

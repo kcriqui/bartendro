@@ -403,3 +403,18 @@ def test_multi_spirit_drink_in_each_section_menu(env):
     admin = client.get("/admin/drinks").text
     row = admin[admin.index(">Long Island Iced Tea<"):].split("</tr>")[0]
     assert all(name in row for name in ("Vodka", "Tequila", "Rum", "Gin"))
+
+
+def test_demo_mode_pages(tmp_path):
+    sessions = open_db(tmp_path / "demo.db")
+    bus = SimBus.with_dispensers(3)
+    driver = Driver(bus.serial, bus.router)
+    driver.discover()
+    b = Bot(driver, sessions)
+    b.start()
+    with TestClient(create_app(b, demo=True, uploads=tmp_path / "up")) as client:
+        page = client.get("/").text
+        assert "/static/demo.js" in page and "Static demo" in page and '"demo": true' in page
+    with TestClient(create_app(b, uploads=tmp_path / "up")) as client:
+        page = client.get("/").text
+        assert "demo.js" not in page and "Static demo" not in page
