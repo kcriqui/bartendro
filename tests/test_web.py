@@ -155,12 +155,24 @@ def test_admin_dispensers_save(env):
     assert b.state.value == "hard_out"  # menu needs more than tequila
 
 
+def rows(*lines):
+    """Drink-editor form fields for [(ingredient, amount, unit[, step])]."""
+    out = {"ing_name": [], "amount": [], "unit": [], "step": []}
+    for name, amount, unit, *step in lines:
+        out["ing_name"].append(name)
+        out["amount"].append(amount)
+        out["unit"].append(unit)
+        out["step"].append(step[0] if step else "after")
+    return out
+
+
 def test_admin_drink_edit(env):
     client, b, _, sessions = env
     r = client.post("/admin/drink/new", data={
         "name": "Screwdriver Deluxe", "description": "OJ + vodka", "enabled": "on",
-        "ingredient": ["1", "4", "", "1"], "parts": ["1", "2", "", "1"]}, follow_redirects=False)
-    assert r.status_code == 303
+        **rows(("Vodka", "1", "parts"), ("orange juice", "2", "parts"), ("", "", "ml"), ("Vodka", "1", "parts"))},
+        follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/admin/drinks"
     with sessions() as s:
         d = s.scalar(select(Drink).where(Drink.name == "Screwdriver Deluxe"))
         assert {(i.ingredient_id, i.parts) for i in d.items} == {(1, 2), (4, 2)}  # vodka rows added
@@ -168,15 +180,82 @@ def test_admin_drink_edit(env):
         drink_id = d.id
     assert "Screwdriver Deluxe" in client.get("/menu/all").text
     assert client.post(f"/admin/drink/{drink_id}/toggle/popular").json() == {"popular": True}
-    # edit it, keeping vodka (the old rows must go before the new ones are added)
-    r = client.post(f"/admin/drink/{drink_id}", data={"name": "Screwdriver Deluxe", "enabled": "on",
-                                                     "ingredient": ["1", "4"], "parts": ["1", "3"]})
-    assert r.status_code == 200
+    # edit it, keeping vodka (the old rows must go before the new ones are added); a new ingredient
+    r = client.post(f"/admin/drink/{drink_id}", data={
+        "name": "Screwdriver Deluxe", "enabled": "on", "category": "House specials",
+        **rows(("Vodka", "30", "ml"), ("Orange Juice", "3", "oz"), ("Blood Orange", "2", "dash"))},
+        follow_redirects=False)
+    assert r.status_code == 303 and "created=Blood%20Orange" in r.headers["location"]
     with sessions() as s:
-        assert {(i.ingredient_id, i.parts) for i in s.get(Drink, drink_id).items} == {(1, 1), (4, 3)}
+        d = s.get(Drink, drink_id)
+        assert [(i.ingredient.name, round(i.parts or 0, 2), i.amount, i.unit) for i in d.items] == \
+            [("Vodka", 30, 30, "ml"), ("Orange Juice", 88.71, 3, "oz"), ("Blood Orange", 0, 2, "dash")]
+        assert d.category == "House specials" and not s.scalar(
+            select(Ingredient).where(Ingredient.name == "Blood Orange")).alcoholic
+    assert "House specials" in client.get("/admin/drinks").text
+    page = client.get(f"/admin/drink/{drink_id}").text
+    assert 'value="3"' in page and "<option selected>oz</option>" in page
+    # duplicate: a switched-off copy to edit
+    r = client.post(f"/admin/drink/{drink_id}/duplicate", follow_redirects=False)
+    copy_id = int(r.headers["location"].rsplit("/", 1)[1])
+    with sessions() as s:
+        copy = s.get(Drink, copy_id)
+        assert copy.name == "Screwdriver Deluxe (copy)" and not copy.enabled and len(copy.items) == 3
+    assert client.post(f"/admin/drink/{drink_id}", data={
+        "name": "X", **rows(("Vodka", "lots", "ml"))}).status_code == 400
     client.post(f"/admin/drink/{drink_id}", data={"delete": "1"})
     with sessions() as s:
         assert s.get(Drink, drink_id) is None
+
+
+def test_drink_preview(env):
+    client, *_ = env
+    data = client.post("/api/drink-preview", json={"rows": [
+        {"ingredient": "Vodka", "amount": "45", "unit": "ml"},
+        {"ingredient": "Orange Juice", "amount": "90", "unit": "ml"},
+        {"ingredient": "Angostura", "amount": "2", "unit": "dash"},
+        {"ingredient": "Mystery Syrup", "amount": "1", "unit": "parts"},
+        {"ingredient": "Ice", "amount": "", "unit": "fill", "step": "before"},
+        {"ingredient": "Gin", "amount": "x", "unit": "ml"}]}).json()
+    how = {l["ingredient"]: l["how"] for l in data["lines"]}
+    assert how["Vodka"] == "pump" and how["Orange Juice"] == "pump"
+    assert how["Mystery Syrup"] == "new" and how["Ice"] == "new"
+    assert data["size_ml"] == 135 and data["errors"] == ["Gin: amount 'x' isn't a number"]
+    vodka_ml = next(l["ml"] for l in data["lines"] if l["ingredient"] == "Vodka")
+    assert data["abv"] == pytest.approx(100 * vodka_ml * 0.4 / 135, abs=0.1)
+    assert data["std_drinks"] == pytest.approx(vodka_ml * 0.4 * 0.789 / 14, abs=0.01)
+    with env[3]() as s:  # nothing was saved
+        assert s.scalar(select(Ingredient).where(Ingredient.name == "Mystery Syrup")) is None
+
+
+def test_admin_drink_list_states(env):
+    client, b, _, sessions = env
+    page = client.get("/admin/drinks").text
+    assert "on the menu" in page and "needs Tequila" in page
+    br = drink_ids(sessions, "Black Russian")[0]
+    client.post(f"/admin/drink/{br}/toggle/enabled")
+    assert "switched off" in client.get("/admin/drinks").text
+
+
+def test_pump_cards_api(env):
+    client, b, bus, sessions = env
+    r = client.post("/api/dispenser/2", json={"ingredient": "tequila", "ticks_per_ml": 3.1})
+    assert r.status_code == 200 and r.json()["ingredient"] == "Tequila" and r.json()["makes"] >= 1
+    with sessions() as s:
+        d = s.get(Dispenser, 2)
+        assert (d.ingredient.name, d.ticks_per_ml) == ("Tequila", 3.1)
+    assert client.post("/api/dispenser/2", json={"ingredient": "Nope"}).status_code == 400
+    assert client.post("/api/dispenser/99", json={"ingredient": ""}).status_code == 400
+    assert client.post("/api/dispenser/2", json={"ingredient": ""}).json()["ingredient"] == ""
+    wait_idle(b)
+    assert client.post("/api/pumps/run", json={"ms": 1, "reverse": True}).status_code == 202
+    wait_idle(b)
+    assert all(x.direction == 1 for x in bus.ports.values())  # forward again afterwards
+    page = client.get("/admin").text
+    assert "Empty line" in page and 'list="bottle-list"' in page
+    client.post("/admin/on-hand", data={"add": "Orange Juice"})
+    with sessions() as s:
+        assert s.get(Ingredient, 4).on_hand
 
 
 def test_admin_ingredient_edit(env):
@@ -212,10 +291,10 @@ def test_hand_added_amounts_in_admin_and_plan(env):
     with sessions() as s:
         manhattan = s.scalar(select(Drink).where(Drink.name == "Manhattan")).id
     form = client.get(f"/admin/drink/{manhattan}").text
-    assert 'value="1 dash"' in form and "stir with ice" in form
+    assert "<option selected>dash</option>" in form and "stir with ice" in form
     r = client.post(f"/admin/drink/{manhattan}", data={
         "name": "Manhattan", "enabled": "on", "finish": "Stir.", "size_ml": "50",
-        "ingredient": ["7", "1"], "parts": ["50 ml", "3 dashes"]}, follow_redirects=False)  # Whiskey, Vodka
+        **rows(("Whiskey", "50", "ml"), ("Vodka", "3", "dash"))}, follow_redirects=False)
     assert r.status_code == 303
     with sessions() as s:
         d = s.get(Drink, manhattan)
@@ -232,8 +311,6 @@ def test_hand_added_amounts_in_admin_and_plan(env):
     assert plan["after"] == [{"ingredient": "Vodka", "ml": None, "text": "3 dashes"}]
     assert plan["pumps"] == [{"dispenser": 15, "ingredient": "Whiskey", "ml": 50}]
     assert plan["finish"] == "Stir."
-    assert client.post(f"/admin/drink/{manhattan}", data={
-        "name": "Manhattan", "ingredient": ["7"], "parts": ["2 pints"]}).status_code == 400
 
 
 def drink_ids(sessions, *names):

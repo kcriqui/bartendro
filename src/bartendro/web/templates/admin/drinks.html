@@ -6,19 +6,25 @@
 <div class="button-row">
   <a class="btn primary" href="/admin/drink/new">New drink</a>
   <form method="post" action="/admin/recipes/load">
-    <button class="btn" title="poured over ice, no shaking: drinks the bot can make on its own">Add classic drinks ({{ n_classics }})</button>
+    <button class="btn plain" title="add the bundled drinks that aren't here yet">Add classic drinks ({{ n_classics }})</button>
   </form>
+  <input id="filter" placeholder="Filter: name, category, ingredient..." autofocus style="flex:1; min-width:200px">
 </div>
-<table class="grid">
-  <tr><th>Drink</th><th>Can make</th><th title="shown on the menu">Menu</th><th title="the essentials section">Essential</th></tr>
-  {% for d in drinks %}
-  <tr>
+<p class="hint">"Menu" switches a drink off for guests even when it can be made; "Essential" puts it
+  in "the essentials" when no party list is active.</p>
+<table class="grid" id="drink-table">
+  <tr><th>Drink</th><th>Section</th><th>Now</th><th title="shown on the menu">Menu</th><th title="the essentials">Essential</th><th></th></tr>
+  {% for d, category, state in rows %}
+  <tr data-filter="{{ (d.name ~ ' ' ~ category ~ ' ' ~ (d.items | map(attribute='ingredient.name') | join(' '))) | lower }}">
     <td><a href="/admin/drink/{{ d.id }}">{{ d.name }}</a>{% if d.source == "classics" %} <span class="muted">classic</span>{% endif %}
-      <span class="muted">{{ d.items | map(attribute="ingredient.name") | join(", ") }}</span></td>
-    <td>{{ "yes" if d.id in can else "" }}</td>
+      <br><span class="muted">{{ d.items | map(attribute="ingredient.name") | join(", ") }}</span></td>
+    <td>{{ category }}</td>
+    <td class="{{ 'level-ok' if state == 'on the menu' else 'level-low' if state == 'switched off' else 'level-out' }}">{{ state }}</td>
     <td><input type="checkbox" data-toggle="/admin/drink/{{ d.id }}/toggle/enabled" {% if d.enabled %}checked{% endif %}></td>
     <td><input type="checkbox" data-toggle="/admin/drink/{{ d.id }}/toggle/popular" {% if d.popular %}checked{% endif %}></td>
+    <td><form method="post" action="/admin/drink/{{ d.id }}/duplicate"><button class="btn small plain">Duplicate</button></form></td>
   </tr>
   {% endfor %}
 </table>
 {% endblock %}
+{% block scripts %}<script>Bartendro.filterTable("#filter", "#drink-table");</script>{% endblock %}

@@ -114,6 +114,27 @@ def scale_recipe(drink: Drink, size_ml: float, strength: int = 0, tartness: int 
             if include_manual or i not in never_pumped}
 
 
+ETHANOL_DENSITY = 0.789  # g/ml
+STANDARD_DRINK_G = 14.0  # US standard drink: 14 g of alcohol
+
+
+def strength_of(lines: list[tuple[Ingredient, float]]) -> tuple[float, float, float]:
+    """(total ml, ABV %, standard drinks) for [(ingredient, ml)] - the measured lines of a pour."""
+    total = sum(ml for _, ml in lines)
+    ethanol = sum(ml * ing.abv / 100 for ing, ml in lines if ing.alcoholic)
+    abv = 100 * ethanol / total if total else 0.0
+    return total, abv, ethanol * ETHANOL_DENSITY / STANDARD_DRINK_G
+
+
+def uses(drink: Drink, ingredient: Ingredient) -> bool:
+    """Does the drink pour `ingredient` (or the generic it stands in for) from a pump?"""
+    chain, ing, depth = set(), ingredient, 0
+    while ing is not None and depth < 10:
+        chain.add(ing.id)
+        ing, depth = ing.generic, depth + 1
+    return any(i.pumpable and i.ingredient_id in chain for i in drink.items)
+
+
 # ------------------------------------------------------------------ categories
 
 def root(ing: Ingredient) -> Ingredient:

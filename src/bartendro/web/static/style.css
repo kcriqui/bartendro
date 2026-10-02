@@ -157,6 +157,15 @@ input.short { width: 6em; }
 .footer { color: var(--muted); font-size: .8em; margin-top: 30px; }
 @media (max-width: 600px) { .grid { font-size: .9em; } .pump-buttons { white-space: normal; } }
 
+.pumps { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 10px 0; }
+.pump { border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px; background: #fafafa; }
+.pump-head { display: flex; gap: 8px; align-items: baseline; }
+.pump-bottle { width: 100%; font-size: 15px; }
+.pump.saved { border-color: var(--ok); }
+.pump .pump-buttons { display: flex; flex-wrap: wrap; gap: 4px; white-space: normal; }
+#preview { background: #f5f5f5; border-radius: 6px; padding: 8px 10px; }
+#preview .bad { color: var(--bad); }
+
 /* 10" touchscreen and other big screens */
 @media (min-width: 900px) {
   body { font-size: 16px; }

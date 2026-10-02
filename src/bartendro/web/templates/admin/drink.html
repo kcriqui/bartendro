@@ -2,47 +2,63 @@
 {% set tab = "drinks" %}
 {% block title %}{{ drink.name or "New drink" }} - {{ bot_name }}{% endblock %}
 {% block admin %}
-{% macro ingredient_select(selected) %}
-<select name="ingredient">
-  <option value=""></option>
-  {% for i in ingredients %}
-  <option value="{{ i.id }}" {% if i.id == selected %}selected{% endif %}>{{ i.name }}{% if i.manual %} (by hand){% endif %}</option>
-  {% endfor %}
-</select>
+{% macro row(name="", amount="", unit="ml", step="after") %}
+<tr class="ing-row">
+  <td><input name="ing_name" list="ingredient-list" value="{{ name }}" placeholder="ingredient" aria-label="ingredient"></td>
+  <td><input name="amount" class="short" inputmode="decimal" value="{{ amount }}" aria-label="amount"></td>
+  <td><select name="unit" aria-label="unit">{% for u in units %}<option {% if u == unit %}selected{% endif %}>{{ u }}</option>{% endfor %}</select></td>
+  <td><select name="step" aria-label="when, if added by hand">
+      <option value="after" {% if step == "after" %}selected{% endif %}>after</option>
+      <option value="before" {% if step == "before" %}selected{% endif %}>before</option></select></td>
+  <td><button type="button" class="btn small plain remove-row" title="remove" aria-label="remove">&times;</button></td>
+</tr>
 {% endmacro %}
+{% if created %}<p class="hint">New ingredient(s): <b>{{ created }}</b> - added as mixers; set ABV / booze
+  under <a href="/admin/ingredients">Ingredients</a> if needed.</p>{% endif %}
 {% set action = "/admin/drink/" ~ (drink.id if drink.id else "new") %}
-<form method="post" action="{{ action }}" class="form">
-  <label>Name <input name="name" value="{{ drink.name }}" required></label>
-  <label>Sort as <input name="sort_name" value="{{ drink.sort_name or '' }}" placeholder="(name)"></label>
-  <label>Description <textarea name="description" rows="3">{{ drink.description or '' }}</textarea></label>
+<form method="post" action="{{ action }}" class="form" id="drink-form">
+  <label>Name <input name="name" value="{{ drink.name }}" required autofocus></label>
+  <label>Description <textarea name="description" rows="2">{{ drink.description or '' }}</textarea></label>
+
+  <h3>Ingredients</h3>
+  <p class="hint">Amounts in ml / cl / oz, or "parts" of the mix. Counted units (dash, leaf, wedge, fill...)
+    and ingredients that are never pumped are added by the guest - "before" or "after" the pour.
+    Bitters, absinthe or half and half are pumped if they're on a pump, else added by hand.</p>
+  <table class="grid" id="ing-table">
+    <tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>By hand</th><th></th></tr>
+    {% for item in drink.items %}
+      {% if item.parts is none %}{{ row(item.ingredient.name, '%g' % (item.amount or 1), item.unit, item.step) }}
+      {% elif item.unit %}{{ row(item.ingredient.name, '%g' % item.amount, item.unit, item.step) }}
+      {% else %}{{ row(item.ingredient.name, '%g' % item.parts, 'parts', item.step) }}{% endif %}
+    {% endfor %}
+    {% for _ in range(blank_rows) %}{{ row() }}{% endfor %}
+  </table>
+  <div class="button-row"><button type="button" class="btn small plain" id="add-row">+ Add ingredient</button></div>
+  <datalist id="ingredient-list">{% for i in ingredients %}<option value="{{ i.name }}">{% endfor %}</datalist>
+  <div id="preview" class="hint" aria-live="polite"></div>
+
+  <h3>Serving</h3>
   <label>Glass <input name="glass" value="{{ drink.glass or '' }}" placeholder="highball, coupe..."></label>
-  <label>Before pouring <input name="instructions" value="{{ drink.instructions or '' }}"
-         placeholder="Over ice. / Pour into a shaker."></label>
-  <label>After pouring (the guest) <textarea name="finish" rows="2"
+  <label>Before pouring (anything not in the list above) <input name="instructions" value="{{ drink.instructions or '' }}"
+         placeholder="Pour into a shaker."></label>
+  <label>After pouring <textarea name="finish" rows="2"
          placeholder="Shake with ice and strain into a chilled glass.">{{ drink.finish or '' }}</textarea></label>
   <label>Glass size (ml) <input name="size_ml" class="short" inputmode="numeric" value="{{ drink.size_ml or '' }}"
          placeholder="{{ opts.drink_size }}"></label>
+  <label>Menu section <input name="category" list="category-list" value="{{ drink.category or '' }}"
+         placeholder="automatic (by the main spirit)"></label>
+  <datalist id="category-list">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+  <label>Sort as <input name="sort_name" value="{{ drink.sort_name or '' }}" placeholder="(name)"></label>
   <label class="check"><input type="checkbox" name="enabled" {% if drink.enabled %}checked{% endif %}> On the menu</label>
   <label class="check"><input type="checkbox" name="popular" {% if drink.popular %}checked{% endif %}> In "the essentials"</label>
 
-  <h3>Ingredients</h3>
-  <p class="hint">Amounts are parts of the mix ("2"), or ml / cl / oz ("30 ml"). Counted amounts
-    ("2 dash", "6 leaf", "4 wedge", "2 tsp"...) and by-hand ingredients are added by the guest:
-    after the pour, or before it with "before" at the end ("1 dash before").</p>
-  <table class="grid">
-    {% for item in drink.items %}
-    <tr><td>{{ ingredient_select(item.ingredient_id) }}</td>
-        <td><input name="parts" class="short" value="{{ (item.hand_text if item.unit else '%g' % item.parts) ~ (' before' if item.by_hand and item.step == 'before' else '') }}"></td></tr>
-    {% endfor %}
-    {% for _ in range(blank_rows) %}
-    <tr><td>{{ ingredient_select(None) }}</td><td><input name="parts" class="short"></td></tr>
-    {% endfor %}
-  </table>
   <div class="button-row">
     <button class="btn primary">Save</button>
-    <a class="btn" href="/admin/drinks">Cancel</a>
-    {% if drink.id %}<button class="btn danger" name="delete" value="1"
-        data-confirm="Delete {{ drink.name }}?">Delete</button>{% endif %}
+    <a class="btn plain" href="/admin/drinks">Cancel</a>
+    {% if drink.id %}<button class="btn plain" formaction="/admin/drink/{{ drink.id }}/duplicate">Duplicate</button>
+    <button class="btn danger" name="delete" value="1" data-confirm="Delete {{ drink.name }}?">Delete</button>{% endif %}
   </div>
 </form>
+<template id="row-template">{{ row() }}</template>
 {% endblock %}
+{% block scripts %}<script>Bartendro.drinkEditor();</script>{% endblock %}

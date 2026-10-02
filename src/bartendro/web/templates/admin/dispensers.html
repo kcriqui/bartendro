@@ -2,44 +2,50 @@
 {% set tab = "dispensers" %}
 {% block title %}Dispensers - {{ bot_name }}{% endblock %}
 {% block admin %}
-<form method="post" action="/admin/dispensers">
-<table class="grid">
-  <tr><th>#</th><th>Bottle</th>{% if opts.use_liquid_level_sensors %}<th>Level</th>{% endif %}
-      <th title="pump calibration; empty = default 2.78">Ticks/ml</th><th>Pump</th></tr>
+<p><b id="menu-count">{{ n_makeable }}</b> drink(s) on the menu with these bottles.
+  <span class="hint">Changing a bottle: <b>Empty line</b> (runs the pump backwards into the old bottle),
+  swap the bottles, pick the new one below (saved straight away), then <b>Prime</b>.</span></p>
+<div class="button-row">
+  <button class="btn plain" data-post="/api/pumps/run" data-body='{"ms": 4000, "reverse": true}'
+          data-confirm="Run every pump with a bottle backwards for 4 s?">Empty all lines</button>
+  <button class="btn plain" data-post="/api/pumps/run" data-body='{"ms": 2000}'
+          data-confirm="Prime every pump with a bottle for 2 s? Put a container under the spout.">Prime all</button>
+</div>
+
+<div class="pumps">
   {% for d in rows %}
-  <tr>
-    <td class="num">{{ d.number }}</td>
-    <td><select name="ingredient{{ d.number }}">
-      <option value="">(empty)</option>
-      {% for i in ingredients %}
-      <option value="{{ i.id }}" {% if i.id == d.ingredient_id %}selected{% endif %}>{{ i.name }}</option>
-      {% endfor %}
-    </select></td>
-    {% if opts.use_liquid_level_sensors %}<td class="level-{{ d.level.value if d.level else 'unknown' }}">{{ d.level.value if d.level else "unknown" }}</td>{% endif %}
-    <td><input name="cal{{ d.number }}" class="short" inputmode="decimal" value="{{ d.ticks_per_ml or '' }}" placeholder="2.78"></td>
-    <td class="pump-buttons">
-      <button type="button" class="btn small" data-post="/api/dispenser/{{ d.number }}/test">Test {{ amount(opts.test_dispense_ml) }}</button>
-      <button type="button" class="btn small" data-post="/api/dispenser/{{ d.number }}/run" data-body='{"ms": 2000}'>Prime 2s</button>
-      <button type="button" class="btn small" data-post="/api/dispenser/{{ d.number }}/run" data-body='{"ms": 2000, "reverse": true}'>Reverse 2s</button>
-    </td>
-  </tr>
+  <div class="pump" data-pump="{{ d.number }}">
+    <div class="pump-head">
+      <b>#{{ d.number }}</b>
+      {% if opts.use_liquid_level_sensors %}<span class="level-{{ d.level.value if d.level else 'unknown' }}">{{ d.level.value if d.level else "unknown" }}</span>{% endif %}
+      <span class="muted pump-makes">{% if d.ingredient %}{{ makes.get(d.number, 0) }} drink(s){% endif %}</span>
+    </div>
+    <input class="pump-bottle" list="bottle-list" value="{{ d.ingredient.name if d.ingredient else '' }}"
+           placeholder="(empty)" aria-label="bottle on pump {{ d.number }}">
+    <div class="pump-buttons">
+      <button type="button" class="btn small plain" data-post="/api/dispenser/{{ d.number }}/run" data-body='{"ms": 4000, "reverse": true}'>Empty line</button>
+      <button type="button" class="btn small" data-post="/api/dispenser/{{ d.number }}/run" data-body='{"ms": 2000}'>Prime</button>
+      <button type="button" class="btn small go" data-post="/api/dispenser/{{ d.number }}/test">Test {{ amount(opts.test_dispense_ml) }}</button>
+    </div>
+    <label class="muted">ticks/ml <input class="pump-cal short" inputmode="decimal" value="{{ d.ticks_per_ml or '' }}" placeholder="2.78"></label>
+  </div>
   {% endfor %}
-</table>
-<p>{{ n_makeable }} drink(s) can be made with these bottles.</p>
-<button class="btn primary">Save</button>
-</form>
+</div>
+<datalist id="bottle-list">{% for i in ingredients %}<option value="{{ i.name }}">{% endfor %}</datalist>
 
 <h3 id="on-hand">On hand (added by hand)</h3>
 <form method="post" action="/admin/on-hand">
-  <p class="hint">Tick what you have for the guest to add: bitters, mint, limes, half and half...
-    Drinks that need something not ticked stay off the menu.</p>
+  <p class="hint">Tick what the guest can add by hand: ice, bitters, mint, limes, half and half...
+    Drinks that need something not ticked (and not on a pump) stay off the menu.</p>
   <div class="checks">
   {% for i in by_hand %}
     <input type="hidden" name="listed" value="{{ i.id }}">
     <label class="check"><input type="checkbox" name="on_hand" value="{{ i.id }}" {% if i.on_hand %}checked{% endif %}> {{ i.name }}</label>
   {% endfor %}
   </div>
-  <button class="btn primary">Save</button>
+  <label class="muted">Add something else on hand: <input name="add" list="all-ingredients" placeholder="ingredient"></label>
+  <datalist id="all-ingredients">{% for i in all_ingredients %}<option value="{{ i.name }}">{% endfor %}</datalist>
+  <div class="button-row"><button class="btn primary">Save</button></div>
 </form>
 
 {% if away %}
@@ -64,3 +70,4 @@
   <button class="btn danger" data-post="/api/reset">Reset</button>
 </div>
 {% endblock %}
+{% block scripts %}<script>Bartendro.pumpCards();</script>{% endblock %}

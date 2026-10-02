@@ -217,7 +217,85 @@ const Bartendro = (() => {
     refresh();
   }
 
+  // --------------------------------------------------------------- admin helpers
+  function filterTable(inputSel, tableSel) {  // type to hide rows (data-filter = searchable text)
+    const input = $(inputSel), rows = document.querySelectorAll(`${tableSel} tr[data-filter]`);
+    input.addEventListener("input", () => {
+      const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+      for (const tr of rows) tr.hidden = !words.every((w) => tr.dataset.filter.includes(w));
+    });
+  }
+
+  function drinkEditor() {
+    const table = $("#ing-table"), tpl = $("#row-template"), preview = $("#preview");
+    const form = $("#drink-form");
+    $("#add-row").addEventListener("click", () => {
+      table.tBodies[0].appendChild(tpl.content.firstElementChild.cloneNode(true));
+      table.querySelector("tr.ing-row:last-child input").focus();
+    });
+    table.addEventListener("click", (e) => {
+      const b = e.target.closest(".remove-row");
+      if (b) { b.closest("tr").remove(); refresh(); }
+    });
+    const HOW = { pump: "pumped", hand: "by hand", missing: "not available now", new: "new ingredient" };
+    let timer;
+    async function refresh() {
+      const rows = [...table.querySelectorAll("tr.ing-row")].map((tr) => ({
+        ingredient: tr.querySelector("[name=ing_name]").value, amount: tr.querySelector("[name=amount]").value,
+        unit: tr.querySelector("[name=unit]").value, step: tr.querySelector("[name=step]").value,
+      })).filter((r) => r.ingredient.trim());
+      if (!rows.length) { preview.textContent = ""; return; }
+      const size = form.querySelector("[name=size_ml]").value;
+      try {
+        const data = await post("/api/drink-preview", { rows, size_ml: size ? +size : null });
+        preview.innerHTML = "";
+        const head = document.createElement("div");
+        head.textContent = `Pours ${amount(data.size_ml)}: ${data.abv}% ABV, ` +
+          `${data.std_drinks} standard drink${data.std_drinks === 1 ? "" : "s"}`;
+        preview.appendChild(head);
+        const ul = document.createElement("ul");
+        for (const l of data.lines) {
+          const li = document.createElement("li");
+          const qty = l.text || (l.ml == null ? "" : amount(l.ml));
+          const when = l.how === "hand" ? ` (${l.step} the pour)` : "";
+          li.textContent = `${l.ingredient}: ${qty} - ${HOW[l.how] || l.how}${when}`;
+          if (l.how === "missing") li.className = "bad";
+          ul.appendChild(li);
+        }
+        preview.appendChild(ul);
+        for (const err of data.errors) {
+          const p = document.createElement("div");
+          p.className = "bad";
+          p.textContent = err;
+          preview.appendChild(p);
+        }
+      } catch (err) { preview.textContent = err.message; }
+    }
+    form.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(refresh, 300); });
+    form.addEventListener("change", () => { clearTimeout(timer); timer = setTimeout(refresh, 100); });
+    refresh();
+  }
+
+  function pumpCards() {  // bottle / calibration saved as soon as they change
+    for (const card of document.querySelectorAll(".pump")) {
+      const n = card.dataset.pump, bottle = card.querySelector(".pump-bottle"), cal = card.querySelector(".pump-cal");
+      let last = bottle.value;
+      async function save() {
+        try {
+          const data = await post(`/api/dispenser/${n}`, { ingredient: bottle.value, ticks_per_ml: cal.value ? +cal.value : null });
+          last = bottle.value = data.ingredient;
+          card.querySelector(".pump-makes").textContent = data.ingredient ? `${data.makes} drink(s)` : "";
+          $("#menu-count").textContent = data.menu;
+          card.classList.add("saved");
+          setTimeout(() => card.classList.remove("saved"), 1500);
+        } catch (err) { toast(err.message); bottle.value = last; }
+      }
+      bottle.addEventListener("change", save);
+      cal.addEventListener("change", save);
+    }
+  }
+
   showStatus(window.BARTENDRO.status);
   connect();
-  return { drinkPage, toast, post };
+  return { drinkPage, drinkEditor, filterTable, pumpCards, toast, post };
 })();

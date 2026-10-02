@@ -244,11 +244,24 @@ class Bot:
 
     def run_pump(self, number: int, ms: int, reverse: bool = False, background: bool = False) -> None:
         """Admin: run one pump for ms milliseconds, e.g. to prime a line or (reverse) empty it."""
+        self.run_pumps([number], ms, reverse, background)
+
+    def run_pumps(self, numbers: list[int] | None, ms: int, reverse: bool = False,
+                  background: bool = False) -> None:
+        """Admin: run several pumps (None: the ones with a bottle) for ms milliseconds - prime all
+        the lines, or empty them back into the bottles (reverse) before swapping bottles."""
         with self.sessions() as s:
-            self._dispenser(s, number)
+            if numbers is None:
+                numbers = [d.number for d in s.scalars(select(Dispenser).where(
+                    Dispenser.ingredient_id.is_not(None), Dispenser.number <= self.dispenser_count))]
+            for n in numbers:
+                self._dispenser(s, n)
+        if not numbers:
+            raise CantPourError("no pumps have a bottle")
         if not 0 < ms <= RUN_PUMP_MAX_MS:
             raise CantPourError(f"run time must be 1-{RUN_PUMP_MAX_MS} ms")
-        self._run(self._run_pump, number - 1, ms, reverse, background=background, allow_broken=True)
+        self._run(self._run_pumps, [n - 1 for n in numbers], ms, reverse, background=background,
+                  allow_broken=True)
 
     def clean(self, which: str = "all", background: bool = False) -> None:
         """Run the pumps for 10 s to flush the lines (old CleanCycle). `which`: all/left/right;
@@ -401,17 +414,22 @@ class Bot:
             self._led_timer.cancel()
             self._led_timer = None
 
-    def _run_pump(self, index: int, ms: int, reverse: bool) -> None:
-        self._set_state(State.POURING, f"running pump #{index + 1}")
-        if reverse:
-            self.driver.set_motor_direction(index, p.MOTOR_DIRECTION_BACKWARD)
+    def _run_pumps(self, indexes: list[int], ms: int, reverse: bool) -> None:
+        what = ", ".join(f"#{i + 1}" for i in indexes)
+        self._set_state(State.POURING, f"{'emptying' if reverse else 'running'} pump {what}")
         try:
-            if not self.driver.dispense_time(index, ms):
-                raise DriverError(f"pump #{index + 1} didn't accept the run command")
+            for i in indexes:  # staggered starts, like cleaning: spreads the current draw
+                if reverse:
+                    self.driver.set_motor_direction(i, p.MOTOR_DIRECTION_BACKWARD)
+                if not self.driver.dispense_time(i, ms):
+                    raise DriverError(f"pump #{i + 1} didn't accept the run command")
+                if len(indexes) > 1:
+                    time.sleep(CLEAN_STAGGER)
             time.sleep(ms / 1000 + 0.2)
         finally:
             if reverse:
-                self.driver.set_motor_direction(index, p.MOTOR_DIRECTION_FORWARD)
+                for i in indexes:
+                    self.driver.set_motor_direction(i, p.MOTOR_DIRECTION_FORWARD)
         self._check()
 
     def _clean(self, which: str) -> None:

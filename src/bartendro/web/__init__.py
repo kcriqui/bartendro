@@ -28,7 +28,9 @@ from .. import __version__
 from ..bot import Bot, BusyError, CantPourError
 from ..db import options
 from ..db import recipes
-from ..db.menu import by_category, makeable_drinks, one_bottle_away, sort_key, suggest_bottles
+from ..db.menu import (PUMP, by_category, can_make, category_of, makeable_drinks, missing_for,
+                       one_bottle_away, pumped_and_on_hand, resolve_line, scale_recipe, sort_key,
+                       strength_of, suggest_bottles, uses)
 from ..db.models import (Dispenser, Drink, Ingredient, Kind, Party, PartyDrink, PourLog, RecipeItem,
                          utcnow)
 from .theme import DEFAULTS as THEME_DEFAULTS, theme_css, valid as valid_color
@@ -64,6 +66,28 @@ class RunRequest(BaseModel):
 
 class CleanRequest(BaseModel):
     which: str = "all"
+
+
+class PumpRequest(BaseModel):
+    ingredient: str = ""            # name; "" = empty
+    ticks_per_ml: float | None = None
+
+
+class RunAllRequest(BaseModel):
+    ms: int = Field(2000, gt=0)
+    reverse: bool = False
+
+
+class PreviewRow(BaseModel):
+    ingredient: str
+    amount: str = ""
+    unit: str = "parts"
+    step: str = "after"
+
+
+class PreviewRequest(BaseModel):
+    size_ml: float | None = None
+    rows: list[PreviewRow] = []
 
 
 def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = None) -> FastAPI:
@@ -197,13 +221,19 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             rows = [have.get(n) or Dispenser(number=n) for n in range(1, bot.dispenser_count + 1)]
             ingredients = s.scalars(select(Ingredient).where(~Ingredient.manual)
                                     .order_by(Ingredient.name)).all()
-            n_makeable = len(makeable_drinks(s, dispenser_count=bot.dispenser_count))
+            makeable = makeable_drinks(s, dispenser_count=bot.dispenser_count)
+            n_makeable = len(makeable)
+            makes = {d.number: sum(1 for x in makeable if uses(x, d.ingredient))
+                     for d in rows if d.ingredient is not None}
             away = one_bottle_away(s, dispenser_count=bot.dispenser_count)
             hand_ids = set(s.scalars(select(RecipeItem.ingredient_id).where(RecipeItem.parts.is_(None))))
-            by_hand = s.scalars(select(Ingredient).where(Ingredient.manual | Ingredient.id.in_(hand_ids))
-                                .order_by(func.lower(Ingredient.name))).all()
+            by_hand = s.scalars(select(Ingredient).where(
+                Ingredient.manual | Ingredient.on_hand | Ingredient.id.in_(hand_ids))
+                .order_by(func.lower(Ingredient.name))).all()
+            all_ingredients = s.scalars(select(Ingredient).order_by(func.lower(Ingredient.name))).all()
             return page(request, "admin/dispensers.html", rows=rows, ingredients=ingredients,
-                        n_makeable=n_makeable, away=away, by_hand=by_hand)
+                        n_makeable=n_makeable, away=away, by_hand=by_hand, makes=makes,
+                        all_ingredients=all_ingredients)
 
     @app.post("/admin/on-hand")
     async def save_on_hand(request: Request):
@@ -213,6 +243,12 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             for ing_id in (int(i) for i in form.getlist("listed")):
                 if ing := s.get(Ingredient, ing_id):
                     ing.on_hand = ing_id in ticked
+            add = " ".join(str(form.get("add", "")).split())
+            if add:
+                ing = s.scalar(select(Ingredient).where(func.lower(Ingredient.name) == add.lower()))
+                if ing is None:
+                    return JSONResponse({"error": f"no ingredient called {add!r}"}, status_code=400)
+                ing.on_hand = True
             s.commit()
         return RedirectResponse("/admin#on-hand", status_code=303)
 
@@ -240,10 +276,18 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
         with sessions() as s:
             drinks = s.scalars(select(Drink).options(selectinload(Drink.items))
                                .order_by(func.lower(Drink.name))).all()
-            can = {d.id for d in makeable_drinks(s, dispenser_count=bot.dispenser_count,
-                                                 enabled_only=False)}
+            pumped, on_hand = pumped_and_on_hand(s, bot.dispenser_count)
+            names = dict(s.execute(select(Ingredient.id, Ingredient.name)).all())
+            rows = []
+            for d in drinks:
+                if can_make(d, pumped, on_hand):
+                    state = "on the menu" if d.enabled else "switched off"
+                else:
+                    missing = sorted(names[i] for i, _ in missing_for(d, pumped, on_hand))
+                    state = "needs " + ", ".join(missing) if missing else "nothing to pump"
+                rows.append((d, category_of(d), state))
             n_classics = len(recipes.read().get("drink", []))
-            return page(request, "admin/drinks.html", drinks=drinks, can=can, n_classics=n_classics,
+            return page(request, "admin/drinks.html", rows=rows, n_classics=n_classics,
                         loaded=request.query_params.get("loaded"))
 
     @app.post("/admin/recipes/load")
@@ -266,9 +310,11 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
                 else s.get(Drink, int(drink_id))
             if drink is None:
                 return RedirectResponse("/admin/drinks", status_code=303)
-            ingredients = s.scalars(select(Ingredient).order_by(Ingredient.name)).all()
+            ingredients = s.scalars(select(Ingredient).order_by(func.lower(Ingredient.name))).all()
+            categories = sorted({category_of(d) for d in s.scalars(select(Drink))} | {"Non-alcoholic"})
             return page(request, "admin/drink.html", drink=drink, ingredients=ingredients,
-                        blank_rows=max(3, 8 - len(drink.items)))
+                        categories=categories, units=recipes.EDITOR_UNITS, blank_rows=2,
+                        created=request.query_params.get("created", ""))
 
     @app.post("/admin/drink/{drink_id}")
     async def save_drink(request: Request, drink_id: str):
@@ -290,26 +336,54 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             drink.glass = str(form.get("glass", "")).strip()
             drink.instructions = str(form.get("instructions", "")).strip()
             drink.finish = str(form.get("finish", "")).strip()
+            drink.category = str(form.get("category", "")).strip()
+            by_name = {i.name.lower(): i for i in s.scalars(select(Ingredient))}
             rows: dict[int, tuple] = {}
-            for ing, text in zip(form.getlist("ingredient"), form.getlist("parts")):
-                if not ing or not str(text).strip():
+            created = []
+            for name, amount, unit, step in zip(form.getlist("ing_name"), form.getlist("amount"),
+                                                form.getlist("unit"), form.getlist("step")):
+                name = " ".join(str(name).split())
+                if not name:
                     continue
                 try:
-                    parts, amount, unit, step = recipes.parse_amount(str(text))
+                    parts, amt, unit, step = recipes.row_line(str(amount), str(unit), str(step))
                 except ValueError as e:
-                    return JSONResponse({"error": str(e)}, status_code=400)
-                old = rows.get(int(ing))
+                    return JSONResponse({"error": f"{name}: {e}"}, status_code=400)
+                ing = by_name.get(name.lower())
+                if ing is None:  # new ingredient: a mixer until edited under Ingredients
+                    ing = by_name[name.lower()] = Ingredient(name=name, alcoholic=False)
+                    s.add(ing)
+                    s.flush()
+                    created.append(name)
+                old = rows.get(ing.id)
                 if old and old[0] is not None and parts is not None:  # listed twice: add up
-                    parts, amount, unit = old[0] + parts, None, ""
-                rows[int(ing)] = (parts, amount, unit, step)
+                    parts, amt, unit = old[0] + parts, None, ""
+                rows[ing.id] = (parts, amt, unit, step)
             s.add(drink)
             drink.items.clear()
             s.flush()  # delete the old rows first: (drink, ingredient) is unique
             drink.items = [RecipeItem(ingredient_id=i, parts=p, amount=a, unit=u, step=st, position=n)
                            for n, (i, (p, a, u, st)) in enumerate(rows.items())]
-            s.add(drink)
             s.commit()
+            if created:
+                return RedirectResponse(f"/admin/drink/{drink.id}?created=" + ", ".join(created),
+                                        status_code=303)
         return RedirectResponse("/admin/drinks", status_code=303)
+
+    @app.post("/admin/drink/{drink_id}/duplicate")
+    def duplicate_drink(drink_id: int):
+        with sessions() as s:
+            d = s.get(Drink, drink_id)
+            if d is None:
+                return RedirectResponse("/admin/drinks", status_code=303)
+            copy = Drink(name=f"{d.name} (copy)", sort_name="", description=d.description, popular=False,
+                         enabled=False, size_ml=d.size_ml, instructions=d.instructions, glass=d.glass,
+                         finish=d.finish, category=d.category, source="",
+                         items=[RecipeItem(ingredient_id=i.ingredient_id, parts=i.parts, amount=i.amount,
+                                           unit=i.unit, step=i.step, position=i.position) for i in d.items])
+            s.add(copy)
+            s.commit()
+            return RedirectResponse(f"/admin/drink/{copy.id}", status_code=303)
 
     @app.post("/admin/drink/{drink_id}/toggle/{field}")
     def toggle_drink(drink_id: int, field: str):
@@ -543,6 +617,81 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
     def api_run(number: int, req: RunRequest):
         bot.run_pump(number, req.ms, req.reverse, background=True)
         return {"ok": True}
+
+    @app.post("/api/dispenser/{number}")
+    def api_set_dispenser(number: int, req: PumpRequest):
+        """Put a bottle on a pump (by ingredient name; "" = empty) and/or set its calibration."""
+        if not 1 <= number <= bot.dispenser_count:
+            raise CantPourError(f"no dispenser #{number}")
+        with sessions() as s:
+            d = s.get(Dispenser, number) or Dispenser(number=number)
+            s.add(d)
+            name = " ".join(req.ingredient.split())
+            if name:
+                ing = s.scalar(select(Ingredient).where(func.lower(Ingredient.name) == name.lower()))
+                if ing is None:
+                    raise CantPourError(f"no ingredient called {name!r} - add it under Ingredients first")
+                if ing.manual:
+                    raise CantPourError(f"{ing.name} is marked as never going on a pump")
+                d.ingredient = ing
+            else:
+                d.ingredient = None
+            d.ticks_per_ml = req.ticks_per_ml if req.ticks_per_ml and req.ticks_per_ml > 0 else None
+            s.commit()
+            makeable = makeable_drinks(s, dispenser_count=bot.dispenser_count)
+            makes = sum(1 for x in makeable if d.ingredient and uses(x, d.ingredient))
+            result = {"ingredient": d.ingredient.name if d.ingredient else "", "makes": makes,
+                      "menu": len(makeable)}
+        if not bot.status()["busy"]:
+            try:
+                bot.check_levels(background=True)
+            except BusyError:
+                pass
+        return result
+
+    @app.post("/api/pumps/run", status_code=202)
+    def api_run_all(req: RunAllRequest):
+        bot.run_pumps(None, req.ms, req.reverse, background=True)
+        return {"ok": True}
+
+    @app.post("/api/drink-preview")
+    def api_drink_preview(req: PreviewRequest):
+        """What the drink editor's unsaved rows would pour: per line pumped / by hand / missing,
+        ml, and the drink's ABV and standard drinks. Nothing is saved."""
+        with sessions() as s, s.no_autoflush:
+            by_name = {i.name.lower(): i for i in s.scalars(select(Ingredient))}
+            drink = Drink(name="preview", items=[])
+            errors = []
+            for n, row in enumerate(req.rows):
+                name = " ".join(row.ingredient.split())
+                if not name:
+                    continue
+                try:
+                    parts, amt, unit, step = recipes.row_line(row.amount, row.unit, row.step)
+                except ValueError as e:
+                    errors.append(f"{name}: {e}")
+                    continue
+                ing = by_name.get(name.lower()) or Ingredient(id=-1 - n, name=name, abv=0.0,
+                                                               alcoholic=False, manual=False)
+                drink.items.append(RecipeItem(ingredient=ing, ingredient_id=ing.id, parts=parts,
+                                              amount=amt, unit=unit, step=step, position=n))
+            measured = sum(i.parts for i in drink.items if i.parts is not None and i.unit in recipes.UNITS_ML)
+            size = req.size_ml or measured or float(options.get(s, "drink_size"))
+            amounts = scale_recipe(drink, size)
+            pumped, on_hand = pumped_and_on_hand(s, bot.dispenser_count)
+            lines = []
+            for i in drink.items:
+                how = resolve_line(i, pumped, on_hand) if i.ingredient.id > 0 else "new"
+                ml = amounts.get(i.ingredient_id)
+                lines.append({"ingredient": i.ingredient.name, "how": how or "missing",
+                              "ml": None if ml is None else round(ml, 1),
+                              "text": i.hand_text if i.parts is None else "", "step": i.step,
+                              "by_hand": i.by_hand})
+            total, abv, std = strength_of([(i.ingredient, amounts[i.ingredient_id]) for i in drink.items
+                                           if i.ingredient_id in amounts])
+            s.rollback()
+        return {"lines": lines, "size_ml": round(size), "total_ml": round(total), "abv": round(abv, 1),
+                "std_drinks": round(std, 2), "errors": errors}
 
     @app.post("/api/clean", status_code=202)
     def api_clean(req: CleanRequest):

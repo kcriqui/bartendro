@@ -109,6 +109,32 @@ def parse_amount(text: str) -> tuple[float | None, float | None, str, str]:
     raise ValueError(f"unit {unit!r}: use ml, cl, oz or {', '.join(HAND_UNITS)}")
 
 
+EDITOR_UNITS = ["parts", *UNITS_ML, *HAND_UNITS]  # the unit choices in the drink editor
+
+
+def row_line(amount: str, unit: str, step: str = "after") -> tuple[float | None, float | None, str, str]:
+    """A drink-editor row -> (parts, amount, unit, step). "parts": a share of the mix; ml / cl /
+    oz: parts in ml, amount kept as written; counted units (dash, leaf, fill, ...): not part of
+    the mix. Raises ValueError for a bad amount or unit."""
+    unit = unit.strip().lower() or "parts"
+    step = step if step in STEPS else "after"
+    if unit == "fill":
+        return None, 1.0, "fill", step
+    try:
+        value = float(str(amount).strip())
+    except ValueError:
+        raise ValueError(f"amount {amount!r} isn't a number") from None
+    if value <= 0:
+        raise ValueError(f"amount {amount!r} must be more than 0")
+    if unit == "parts":
+        return value, None, "", step
+    if unit in UNITS_ML:
+        return value * UNITS_ML[unit], value, unit, step
+    if unit in HAND_UNITS:
+        return None, value, unit, step
+    raise ValueError(f"unit {unit!r}: use one of {', '.join(EDITOR_UNITS)}")
+
+
 def _norm(name: str) -> str:
     return " ".join(name.lower().split())
 
