@@ -81,8 +81,9 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 
 ## Current state / next steps (2026-10-02)
 - `modernize` pushed, 97 tests passing. Everything so far runs only against the simulator.
-- Open question for Kevin: fix ingredient names with a lost accent from the old dbs
-  ("Tequila, Jalape�o Infused", "J�germeister", "Strawberry Pur�e") in build/bartendro.db.
+- Accented names (Jägermeister, Piña Colada, Strawberry Purée...) are fine UTF-8 in the old
+  and new dbs; "�" only appears when a script prints to the Windows console. Check the bytes
+  (`text_factory = bytes`) before "fixing" text, or set `PYTHONIOENCODING=utf-8`.
 - Next: first real-hardware test (Pi + mini-router + 1-2 pumps, docs/pi-setup.md), then
   milestone 5 (install script, systemd, hotspot, kiosk for the Waveshare 10.1" screen), then
   small-pour tuning (ideas in milestone 4 notes) with real pumps and a scale.
