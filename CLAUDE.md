@@ -24,7 +24,12 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    WebSocket pour status to every screen. No login (Kevin's call): anyone on the bot's WiFi
    can use admin. Kiosk on localhost + phones at the same time. Not done yet: old-db upload in
    the UI, liquid-level calibration page, "feeling lucky" / shotbot UI / turbo options.
-4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 55 drinks
+   2026-10-02: original Bartendro look as the default theme (colours from
+   ui/content/static/css/bartendro.css, logo/robot images; `scripts/render_old_ui.py` renders
+   the old templates to build/old-ui for comparison); menu = "the essentials" (2 rows) + a
+   button per category (/menu/<section>); parties (theme + drink list, one active, preview with
+   ?party=<id>); admin drink editor with live preview, pump cards that save on change.
+4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 62 drinks (7 non-alcoholic)
    written for this project (amounts are facts from classic/IBA specs; no copied text - the
    GitHub IBA datasets are scrapes of IBA's site + Wikipedia, so not bundled; TheCocktailDB must
    not be redistributed). **Kevin's rules:**
@@ -32,9 +37,12 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
      rinse, muddled mint/lime, ice) or after (dashes of bitters, shake/stir per `finish`).
      Ice is a before-the-pour checklist line (`[1, "fill", "Ice", "before"]`), never "Over ice"
      text; Ice starts on hand. Sazerac exists neat and "on the Rocks".
-   - By-hand recipe lines: counted units (parts NULL: dash, leaf, wedge, tsp...) or measured
-     amounts of `manual` ingredients (half and half / cream are never pumped - too hard to
-     clean). `step` = before/after; the UI shows a checklist before pouring.
+   - Each recipe line is pumped or added by hand, decided at pour time (`menu.resolve_line`):
+     pumped if its ingredient is on a dispenser and the amount can be pumped (counted units
+     convert via `PUMP_ML`: dash 0.9 ml...), else by hand if on hand. Bitters, absinthe, half
+     and half can be either; `Ingredient.manual` = can never be pumped (ice, mint, wedges).
+     Pumped amounts under option `min_pump_ml` go by hand if on hand. `step` = before/after;
+     a pumped "before" line (absinthe rinse) pours in two stages with a Continue in between.
    - What's available by hand is tracked like the pumps: `Ingredient.on_hand` (Admin >
      Dispensers > On hand). Drinks only show when pumped bottles are loaded AND by-hand items
      are on hand.
@@ -42,7 +50,12 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
      (plain Tequila won't do); a reposado bottle can make generic-Tequila drinks.
    Loader matches existing ingredients by name/alias, links brands (Kahlua -> Coffee Liqueur)
    and `generic` children; classic drinks pour their recipe total (size_ml). "One step away"
-   (load a bottle / get something on hand) + `suggest N` bottle planner.
+   (load a bottle / get something on hand) + `suggest N` bottle planner (beam search).
+   - `Ingredient.alcoholic` = booze vs mixer (strength button scales booze). Drink section =
+     `Drink.category` override, else the main spirit's top-level generic (menu.category_of).
+   - Small pours: brainstorm only so far (plan file / chat 2026-10-02): independent size and
+     strength-in-standard-drinks controls, sub-linear mixer scaling, minimum pour floor,
+     per-pump calibration offset (ticks = a*ml + b). Needs real pumps to tune.
 5. Install script / systemd service, NetworkManager hotspot, optional Chromium kiosk.
 
 ## Layout
@@ -63,6 +76,7 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
   (`bartendro-web [--sim N]`, port 8080), `templates/`, `static/` (style.css, app.js).
 - `db/recipes.py` - loads classics.toml (or a file like it): `bartendro-db load-recipes`,
   Admin > Drinks button. `db/menu.py` also has one_bottle_away() and suggest_bottles().
+- `web/theme.py` - party colours -> CSS variable overrides; logos in `<db dir>/uploads`.
 - `config.py` - per-bot TOML (`docs/bartendro.example.toml`): ports, dispensers, db path, screen.
 - Schema change: edit models.py, then `bartendro-db --db scratch.db revision -m "..."`, review
   the generated file (add server_default for new NOT NULL columns); `test_migrations_match_models`
