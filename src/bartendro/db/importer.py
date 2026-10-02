@@ -58,7 +58,10 @@ class _Old:
     def __init__(self, path: Path):
         if not path.exists():
             raise ImportError_(f"{path} does not exist")
-        self.conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+        # Not a "file:...?mode=ro" URI: SQLite rejects those for Windows network paths
+        # (\\server\share\...). query_only keeps the old file untouched just the same.
+        self.conn = sqlite3.connect(path)
+        self.conn.execute("PRAGMA query_only = ON")
         self.conn.row_factory = sqlite3.Row
         try:
             self.tables = {r[0] for r in self.conn.execute(
@@ -97,9 +100,12 @@ def _text(value) -> str:
     return (value or "").strip() if isinstance(value, str) else ("" if value is None else str(value))
 
 
-def import_legacy(old_path: str | Path, session: Session, replace: bool = False) -> Report:
+def import_legacy(old_path: str | Path, session: Session, replace: bool = False,
+                  logs: bool = True, settings: bool = True) -> Report:
     """Import `old_path` into `session`'s database (schema already up to date) and commit.
-    Refuses to touch a database that already has drinks or ingredients unless `replace`."""
+    Refuses to touch a database that already has drinks or ingredients unless `replace`.
+    `logs=False`: leave out the drink / shot logs; `settings=False`: leave out the options
+    (sizes, password, ...) - just the recipes and the bottles."""
     old = _Old(Path(old_path))
     try:
         has_data = session.scalar(select(func.count()).select_from(Ingredient)) or \
@@ -121,8 +127,10 @@ def import_legacy(old_path: str | Path, session: Session, replace: bool = False)
         _import_ingredients(old, session, report)
         _import_drinks(old, session, report)
         _import_dispensers(old, session, report, sensors)
-        _import_options(old_options, session, report)
-        _import_logs(old, session, report)
+        if settings:
+            _import_options(old_options, session, report)
+        if logs:
+            _import_logs(old, session, report)
         for table in NOT_IMPORTED:
             n = len(old.rows(table, order="rowid"))
             if n:

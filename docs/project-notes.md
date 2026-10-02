@@ -61,3 +61,15 @@ password (Kevin's choice). Restart the app to reset it to the showcase.
   Kevin runs `sudo tail -n 40 /var/log/app_lifecycle.log`. Funnel / ACL changes are Kevin's to make.
 - The static GitHub Pages demo was removed on 2026-10-02 (gh-pages deleted). GitHub's API refused
   to switch Pages off for this fork; with no branch it serves nothing.
+
+## Bot database (2026-10-02)
+
+`build/bartendro.db` (on the NAS, git-ignored) is the database for Kevin's bots: the recipes and
+bottles from `lunarville-bartendro.db` (an old-style bot database; no logs, no settings) plus the
+bundled drinks. Built by `build/merge_lunarville.py`. Kevin's choices: for same-name drinks keep
+Lunarville's recipe (Black Russian, Cape Cod, Whiskey Sour, Greyhound, Cosmopolitan, Kamikaze,
+Fuzzy Navel, Amaretto Sour, Hairy Navel, White Russian, Screwdriver; Tequila Sunrise was identical)
+except Manhattan (web version). "Empty" bottles became empty pumps (#3, #15); "Tequia, Anejo"
+renamed Anejo Tequila; Patron Citronge and Pierre Ferrand dry curacao are brands of Triple Sec,
+the Bourbon variants brands of Whiskey, "Lime Juice, Persian" a brand of Lime Juice.
+Settings are the defaults (Lunarville used drink_size 100, taster 20).

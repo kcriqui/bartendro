@@ -360,3 +360,12 @@ def test_dbcli(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "#3   Baileys" in out and "#4" not in out and "Black Russian" in out
     assert dbcli(["--db", str(DEFAULT_DB), "upgrade"]) == 2  # old file: use import
+
+
+def test_import_recipes_and_bottles_only(tmp_path, session):
+    report = import_legacy(make_old_db(tmp_path / "old.db"), session, logs=False, settings=False)
+    assert "log entries" not in report.counts and "options" not in report.counts
+    assert session.scalars(select(PourLog)).all() == []
+    assert options.get(session, "metric") is False  # the old db's metric=1 not imported
+    assert len(session.scalars(select(Drink)).all()) == 3
+    assert session.get(Dispenser, 1).ingredient_id == 2

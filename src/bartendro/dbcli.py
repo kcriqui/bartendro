@@ -49,7 +49,8 @@ def cmd_import(args) -> int:
     path = _db_path(args)
     Session = open_db(path)
     with Session() as s:
-        report = import_legacy(args.old_db, s, replace=args.replace)
+        report = import_legacy(args.old_db, s, replace=args.replace, logs=not args.no_logs,
+                               settings=not args.no_settings)
     print(f"Imported {args.old_db} into {path}:")
     for what, n in report.counts.items():
         print(f"  {n:5d} {what}")
@@ -158,6 +159,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("import", help="copy an old (Python 2) bartendro.db into the database")
     s.add_argument("old_db")
     s.add_argument("--replace", action="store_true", help="delete existing drinks/ingredients first")
+    s.add_argument("--no-logs", action="store_true", help="leave out the drink and shot logs (stats)")
+    s.add_argument("--no-settings", action="store_true", help="leave out the options (sizes, password, ...)")
     s.set_defaults(fn=cmd_import)
 
     s = sub.add_parser("show", help="dispensers and the drinks that can be made")
