@@ -15,9 +15,16 @@ def make_engine(path: str | Path) -> Engine:
 
     @event.listens_for(engine, "connect")
     def _sqlite_pragmas(dbapi_conn, _record):
+        # Let SQLAlchemy run the transactions: Python's sqlite3 module otherwise skips BEGIN
+        # before DDL, so a failed migration would leave a half-changed schema.
+        dbapi_conn.isolation_level = None
         cur = dbapi_conn.cursor()
         cur.execute("PRAGMA foreign_keys=ON")
         cur.close()
+
+    @event.listens_for(engine, "begin")
+    def _begin(conn):
+        conn.exec_driver_sql("BEGIN")
 
     return engine
 

@@ -138,8 +138,22 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
                                     .order_by(Ingredient.name)).all()
             n_makeable = len(makeable_drinks(s, dispenser_count=bot.dispenser_count))
             away = one_bottle_away(s, dispenser_count=bot.dispenser_count)
+            hand_ids = set(s.scalars(select(RecipeItem.ingredient_id).where(RecipeItem.parts.is_(None))))
+            by_hand = s.scalars(select(Ingredient).where(Ingredient.manual | Ingredient.id.in_(hand_ids))
+                                .order_by(func.lower(Ingredient.name))).all()
             return page(request, "admin/dispensers.html", rows=rows, ingredients=ingredients,
-                        n_makeable=n_makeable, away=away)
+                        n_makeable=n_makeable, away=away, by_hand=by_hand)
+
+    @app.post("/admin/on-hand")
+    async def save_on_hand(request: Request):
+        form = await request.form()
+        ticked = {int(i) for i in form.getlist("on_hand")}
+        with sessions() as s:
+            for ing_id in (int(i) for i in form.getlist("listed")):
+                if ing := s.get(Ingredient, ing_id):
+                    ing.on_hand = ing_id in ticked
+            s.commit()
+        return RedirectResponse("/admin#on-hand", status_code=303)
 
     @app.post("/admin/dispensers")
     async def save_dispensers(request: Request):
@@ -220,18 +234,18 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
                 if not ing or not str(text).strip():
                     continue
                 try:
-                    parts, amount, unit = recipes.parse_amount(str(text))
+                    parts, amount, unit, step = recipes.parse_amount(str(text))
                 except ValueError as e:
                     return JSONResponse({"error": str(e)}, status_code=400)
                 old = rows.get(int(ing))
                 if old and old[0] is not None and parts is not None:  # listed twice: add up
                     parts, amount, unit = old[0] + parts, None, ""
-                rows[int(ing)] = (parts, amount, unit)
+                rows[int(ing)] = (parts, amount, unit, step)
             s.add(drink)
             drink.items.clear()
             s.flush()  # delete the old rows first: (drink, ingredient) is unique
-            drink.items = [RecipeItem(ingredient_id=i, parts=p, amount=a, unit=u, position=n)
-                           for n, (i, (p, a, u)) in enumerate(rows.items())]
+            drink.items = [RecipeItem(ingredient_id=i, parts=p, amount=a, unit=u, step=st, position=n)
+                           for n, (i, (p, a, u, st)) in enumerate(rows.items())]
             s.add(drink)
             s.commit()
         return RedirectResponse("/admin/drinks", status_code=303)
@@ -257,7 +271,8 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
     @app.get("/admin/ingredient/{ing_id}")
     def admin_ingredient(request: Request, ing_id: str):
         with sessions() as s:
-            ing = Ingredient(name="", brand="", description="", abv=0, kind=Kind.OTHER, manual=False) \
+            ing = Ingredient(name="", brand="", description="", abv=0, kind=Kind.OTHER, manual=False,
+                             on_hand=False) \
                 if ing_id == "new" else s.get(Ingredient, int(ing_id))
             if ing is None:
                 return RedirectResponse("/admin/ingredients", status_code=303)
@@ -291,6 +306,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
             ing.abv = float(form.get("abv") or 0)
             ing.kind = Kind(form.get("kind", "other"))
             ing.manual = bool(form.get("manual"))
+            ing.on_hand = bool(form.get("on_hand"))
             generic = form.get("generic_id", "")
             ing.generic_id = int(generic) if generic and generic != str(ing.id) else None
             s.add(ing)
@@ -349,9 +365,11 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
         return {"name": plan.name, "size_ml": plan.size_ml,
                 "pumps": [{"dispenser": n, "ingredient": names.get(n, "?"), "ml": round(ml, 1)}
                           for n, ml in sorted(plan.pumps.items())],
-                "manual": [{"ingredient": h.ingredient, "ml": None if h.ml is None else round(h.ml, 1),
-                            "text": h.text} for h in plan.manual],
-                "finish": plan.finish}
+                "before": [_hand(h) for h in plan.before], "after": [_hand(h) for h in plan.after],
+                "instructions": plan.instructions, "finish": plan.finish}
+
+    def _hand(h) -> dict:
+        return {"ingredient": h.ingredient, "ml": None if h.ml is None else round(h.ml, 1), "text": h.text}
 
     @app.post("/api/drink/{drink_id}/make", status_code=202)
     def api_make(drink_id: int, req: MakeRequest):

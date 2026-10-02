@@ -29,11 +29,25 @@
 <button class="btn primary">Save</button>
 </form>
 
+<h3 id="on-hand">On hand (added by hand)</h3>
+<form method="post" action="/admin/on-hand">
+  <p class="hint">Tick what you have for the guest to add: bitters, mint, limes, half and half...
+    Drinks that need something not ticked stay off the menu.</p>
+  <div class="checks">
+  {% for i in by_hand %}
+    <input type="hidden" name="listed" value="{{ i.id }}">
+    <label class="check"><input type="checkbox" name="on_hand" value="{{ i.id }}" {% if i.on_hand %}checked{% endif %}> {{ i.name }}</label>
+  {% endfor %}
+  </div>
+  <button class="btn primary">Save</button>
+</form>
+
 {% if away %}
-<h3>One bottle away</h3>
+<h3>One step away</h3>
 <table class="grid">
-  {% for ing, drinks in away %}
-  <tr><td>Load <b>{{ ing.name }}</b></td><td>{{ drinks | map(attribute="name") | join(", ") }}</td></tr>
+  {% for ing, by_hand, drinks in away %}
+  <tr><td>{{ "Get" if by_hand else "Load" }} <b>{{ ing.name }}</b>{% if by_hand %} <span class="muted">by hand</span>{% endif %}</td>
+      <td>{{ drinks | map(attribute="name") | join(", ") }}</td></tr>
   {% endfor %}
 </table>
 {% endif %}

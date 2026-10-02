@@ -56,9 +56,12 @@ class Level(str, enum.Enum):
 
 
 class Ingredient(Base):
-    """Anything that goes in a drink: a generic ingredient ("Vodka") or a specific bottle
-    ("Tito's", generic_id -> Vodka). A recipe may ask for either; a generic ingredient is
-    available when any of its specific ones is on a dispenser (old booze groups)."""
+    """Anything that goes in a drink: a generic ingredient ("Vodka") or a specific one
+    ("Tito's" or "Reposado Tequila", generic_id -> its generic). A recipe asking for a generic
+    ingredient can use any of its specific ones (old booze groups); a recipe asking for a
+    specific one needs exactly that (a Reposado drink is never made with plain Tequila).
+    `manual`: never pumped (bitters, mint, half and half). `on_hand`: the guest can add it by
+    hand right now - the by-hand counterpart of being on a dispenser."""
     __tablename__ = "ingredient"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -68,6 +71,7 @@ class Ingredient(Base):
     abv: Mapped[float] = mapped_column(Float, default=0.0)
     kind: Mapped[Kind] = mapped_column(_enum(Kind), default=Kind.OTHER)
     manual: Mapped[bool] = mapped_column(Boolean, default=False)  # added by hand, never pumped
+    on_hand: Mapped[bool] = mapped_column(Boolean, default=False)  # available to add by hand
     generic_id: Mapped[int | None] = mapped_column(ForeignKey("ingredient.id"))
     generic_order: Mapped[int] = mapped_column(Integer, default=0)  # sort order within its generic
 
@@ -104,9 +108,12 @@ class Drink(Base):
 class RecipeItem(Base):
     __tablename__ = "recipe_item"
     """One ingredient of a drink: its share of the mix (`parts`; recipes from the bundled file
-    use ml as parts and keep the amount as written in `amount` + `unit`, e.g. 2 oz), or, with
-    parts None, a small amount the guest adds by hand after the pour ("2 dash" of bitters):
-    never pumped, not part of the mix, shown as a reminder."""
+    use ml as parts and keep the amount as written in `amount` + `unit`, e.g. 2 oz).
+
+    Added by hand (`by_hand`) instead of pumped when the ingredient is manual (half and half:
+    a share of the mix, scaled with the glass) or the amount is counted (parts None: "2 dash",
+    "6 leaf" - not part of the mix). `step` says when: "before" the pour (absinthe rinse,
+    muddled mint) or "after" (bitters, cream)."""
     __tablename__ = "recipe_item"
     __table_args__ = (UniqueConstraint("drink_id", "ingredient_id"),
                       CheckConstraint("parts IS NULL OR parts > 0", name="parts_positive"))
@@ -117,6 +124,7 @@ class RecipeItem(Base):
     parts: Mapped[float | None] = mapped_column(Float)
     amount: Mapped[float | None] = mapped_column(Float)
     unit: Mapped[str] = mapped_column(String(20), default="")
+    step: Mapped[str] = mapped_column(String(10), default="after")  # by hand: "before" / "after" the pour
     position: Mapped[int] = mapped_column(Integer, default=0)
 
     drink: Mapped[Drink] = relationship(back_populates="items")
@@ -124,8 +132,8 @@ class RecipeItem(Base):
 
     @property
     def by_hand(self) -> bool:
-        """Added by the guest after the pour (a dash of bitters), not by the pumps."""
-        return self.parts is None
+        """Added by the guest (a dash of bitters, half and half), not by the pumps."""
+        return self.parts is None or self.ingredient.manual
 
     @property
     def hand_text(self) -> str:
@@ -133,8 +141,11 @@ class RecipeItem(Base):
         return amount_text(self.amount, self.unit)
 
 
+# Counted amounts, always added by hand (singular: plural)
 HAND_UNITS = {"dash": "dashes", "drop": "drops", "barspoon": "barspoons", "pinch": "pinches",
-              "splash": "splashes"}
+              "splash": "splashes", "tsp": "tsp", "leaf": "leaves", "sprig": "sprigs",
+              "wedge": "wedges", "slice": "slices", "cube": "cubes", "piece": "pieces"}
+STEPS = ("before", "after")
 
 
 def amount_text(amount: float | None, unit: str) -> str:

@@ -24,16 +24,23 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    WebSocket pour status to every screen. No login (Kevin's call): anyone on the bot's WiFi
    can use admin. Kiosk on localhost + phones at the same time. Not done yet: old-db upload in
    the UI, liquid-level calibration page, "feeling lucky" / shotbot UI / turbo options.
-4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 51 drinks
+4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 54 drinks
    written for this project (amounts are facts from classic/IBA specs; no copied text - the
    GitHub IBA datasets are scrapes of IBA's site + Wikipedia, so not bundled; TheCocktailDB must
-   not be redistributed). **Kevin's rule: the bot only pours liquids. Drinks are either poured
-   over ice, or poured into a shaker/mixing glass and finished by the guest (`finish`); small
-   amounts like dashes of bitters or absinthe are hand-added recipe lines (parts NULL, unit
-   dash/drop/barspoon/pinch/splash) shown as a reminder after the pour. Nothing muddled or
-   blended.** Loader matches existing ingredients by name/alias and links brands (Kahlua ->
-   Coffee Liqueur); classic drinks pour their recipe total (size_ml). "One bottle away" +
-   `suggest N` bottle planner.
+   not be redistributed). **Kevin's rules:**
+   - The bot only pours liquids. The guest does the rest by hand, before the pour (absinthe
+     rinse, muddled mint/lime) or after (dashes of bitters, shake/stir per `finish`).
+   - By-hand recipe lines: counted units (parts NULL: dash, leaf, wedge, tsp...) or measured
+     amounts of `manual` ingredients (half and half / cream are never pumped - too hard to
+     clean). `step` = before/after; the UI shows a checklist before pouring.
+   - What's available by hand is tracked like the pumps: `Ingredient.on_hand` (Admin >
+     Dispensers > On hand). Drinks only show when pumped bottles are loaded AND by-hand items
+     are on hand.
+   - Specific spirits stay specific: a recipe asking for Reposado Tequila needs reposado
+     (plain Tequila won't do); a reposado bottle can make generic-Tequila drinks.
+   Loader matches existing ingredients by name/alias, links brands (Kahlua -> Coffee Liqueur)
+   and `generic` children; classic drinks pour their recipe total (size_ml). "One step away"
+   (load a bottle / get something on hand) + `suggest N` bottle planner.
 5. Install script / systemd service, NetworkManager hotspot, optional Chromium kiosk.
 
 ## Layout
@@ -56,7 +63,10 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
   Admin > Drinks button. `db/menu.py` also has one_bottle_away() and suggest_bottles().
 - `config.py` - per-bot TOML (`docs/bartendro.example.toml`): ports, dispensers, db path, screen.
 - Schema change: edit models.py, then `bartendro-db --db scratch.db revision -m "..."`, review
-  the generated file; `tests/test_db.py::test_migrations_match_models` fails until you do.
+  the generated file (add server_default for new NOT NULL columns); `test_migrations_match_models`
+  fails until you do, `test_upgrade_keeps_data` checks a populated db survives. Migrations run
+  with foreign keys off in one transaction (db/migrations/env.py) - batch mode drops and
+  recreates tables, which otherwise breaks or cascade-deletes referencing rows.
 - Port old logic faithfully; when changing behaviour, note it in a comment (e.g. discovery
   retries are now bounded).
 

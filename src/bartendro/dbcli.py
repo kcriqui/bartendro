@@ -81,9 +81,10 @@ def cmd_show(args) -> int:
             print(f"  {d.name}")
         away = one_bottle_away(s, dispenser_count=count)
         if away:
-            print("One bottle away:")
-            for ing, unlocked in away:
-                print(f"  load {ing.name} to make: {', '.join(d.name for d in unlocked)}")
+            print("One step away:")
+            for ing, by_hand, unlocked in away:
+                how = "get (by hand)" if by_hand else "load"
+                print(f"  {how} {ing.name} to make: {', '.join(d.name for d in unlocked)}")
     return 0
 
 

@@ -24,8 +24,13 @@ const Bartendro = (() => {
   }
 
   let overlayTimer;
+  function handLine(h) {  // {ingredient, ml, text} or [ingredient, ml, text]
+    const [name, ml, text] = Array.isArray(h) ? h : [h.ingredient, h.ml, h.text];
+    return text ? `${text} ${name}` : `${amount(ml)} ${name}`;
+  }
+
   function overlay({ title, text = "", manual = [], spinner = false, bad = false, reset = false, close = false,
-                     autoHide = 0 }) {
+                     autoHide = 0, go = null }) {
     const o = $("#overlay");
     $("#overlay-title").textContent = title;
     $("#overlay-text").textContent = text;
@@ -35,11 +40,15 @@ const Bartendro = (() => {
     $("#overlay-close").hidden = !close;
     const ul = $("#overlay-manual");
     ul.innerHTML = "";
-    for (const [name, ml, text] of manual) {  // [ingredient, ml or null, "2 dashes" or ""]
+    for (const h of manual) {
       const li = document.createElement("li");
-      li.textContent = text ? `${text} ${name}` : `${name}: ${amount(ml)}`;
+      li.textContent = handLine(h);
       ul.appendChild(li);
     }
+    $("#overlay-close").textContent = go ? "Cancel" : "OK";
+    const goBtn = $("#overlay-go");
+    goBtn.hidden = !go;
+    goBtn.onclick = go ? () => { hideOverlay(); go(); } : null;
     o.classList.toggle("bad", bad);
     o.hidden = false;
     clearTimeout(overlayTimer);
@@ -83,7 +92,7 @@ const Bartendro = (() => {
     if (ev.type === "status") showStatus(ev);
     else if (ev.type === "pouring") overlay({ title: `Pouring ${ev.name}`, text: amount(ev.ml), spinner: true });
     else if (ev.type === "done") {
-      const manual = ev.manual || [];
+      const manual = ev.after || [];
       const todo = manual.length || ev.finish;
       let text = `Your ${ev.name} is ready.`;
       if (manual.length) text = `Now add to your ${ev.name}:`;
@@ -133,7 +142,7 @@ const Bartendro = (() => {
   function drinkPage() {
     const sec = $(".drink");
     const id = sec.dataset.drink, step = +sec.dataset.step, max = +sec.dataset.max, steps = +sec.dataset.steps;
-    let size = +sec.dataset.size, strength = 0;
+    let size = +sec.dataset.size, strength = 0, plan = null;
     const strengthNames = { "-2": "much weaker", "-1": "weaker", "0": "normal", "1": "stronger", "2": "much stronger" };
 
     async function refresh() {
@@ -149,8 +158,10 @@ const Bartendro = (() => {
       $("#make").disabled = false;
       const table = $("#recipe");
       table.innerHTML = "";
-      const rows = data.pumps.map((p) => [p.ingredient, amount(p.ml)])
-        .concat(data.manual.map((m) => [`${m.ingredient} (add after pouring)`, m.text || amount(m.ml)]));
+      plan = data;
+      const rows = data.before.map((m) => [`${m.ingredient} (first, by hand)`, m.text || amount(m.ml)])
+        .concat(data.pumps.map((p) => [p.ingredient, amount(p.ml)]))
+        .concat(data.after.map((m) => [`${m.ingredient} (after pouring, by hand)`, m.text || amount(m.ml)]));
       for (const [name, qty] of rows) {
         const tr = table.insertRow();
         tr.insertCell().textContent = name;
@@ -176,9 +187,18 @@ const Bartendro = (() => {
       catch (err) { toast(err.message); }
       finally { btn.disabled = false; }
     }
-    $("#make").addEventListener("click", () => make(size));
+    // Drinks with a before-pour step (absinthe rinse, muddled mint) get a checklist first.
+    function confirmThen(ml) {
+      if (plan && plan.before.length) {
+        overlay({ title: "First, by hand", text: plan.instructions, manual: plan.before, close: true,
+                  go: () => make(ml) });
+      } else {
+        make(ml);
+      }
+    }
+    $("#make").addEventListener("click", () => confirmThen(size));
     const taster = $("#taster");
-    if (taster) taster.addEventListener("click", () => make(+taster.dataset.taster));
+    if (taster) taster.addEventListener("click", () => confirmThen(+taster.dataset.taster));
     refresh();
   }
 

@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .db import options
-from .db.menu import makeable_drinks, scale_recipe
+from .db.menu import makeable_drinks, pumped_and_on_hand, scale_recipe
 from .db.models import Dispenser, Drink, Ingredient, Level, PourLog
 from .hw import protocol as p
 from .hw.driver import MAX_DISPENSE_ML, DriverError, OverCurrentError
@@ -79,8 +79,8 @@ class CantPourError(BotError):
 
 @dataclass
 class HandStep:
-    """Something the guest adds after the pour: a manual ingredient's share of the mix (ml) or a
-    hand-added amount like "2 dashes" (text)."""
+    """Something the guest adds before or after the pour: a manual ingredient's share of the
+    mix (ml, e.g. half and half) or a counted amount like "2 dashes" (text)."""
     ingredient: str
     ml: float | None = None
     text: str = ""
@@ -96,8 +96,10 @@ class Plan:
     name: str
     size_ml: float
     pumps: dict[int, float]  # dispenser number -> ml
-    manual: list[HandStep] = field(default_factory=list)  # added by the guest after the pour
-    finish: str = ""  # e.g. "Shake with ice and strain."
+    after: list[HandStep] = field(default_factory=list)   # the guest adds these after the pour
+    before: list[HandStep] = field(default_factory=list)  # ...and these first (absinthe rinse, mint)
+    instructions: str = ""  # what goes under the spout, e.g. "Pour into a shaker."
+    finish: str = ""        # e.g. "Shake with ice and strain."
 
     @property
     def pumped_ml(self) -> float:
@@ -177,15 +179,18 @@ class Bot:
             amounts = scale_recipe(drink, size, strength, tartness, include_manual=True)
             if not amounts:
                 raise CantPourError(f"{drink.name} has nothing for the pumps to pour")
-            plan = Plan(drink.id, drink.name, size, {}, finish=drink.finish)
+            plan = Plan(drink.id, drink.name, size, {}, instructions=drink.instructions,
+                        finish=drink.finish)
+            _, on_hand = pumped_and_on_hand(s, self.dispenser_count)
             for item in drink.items:
                 if item.by_hand:
-                    plan.manual.append(HandStep(item.ingredient.name, text=item.hand_text))
+                    if item.ingredient_id not in on_hand:
+                        raise CantPourError(f"{item.ingredient.name} isn't on hand")
+                    step = (HandStep(item.ingredient.name, text=item.hand_text) if item.parts is None
+                            else HandStep(item.ingredient.name, amounts[item.ingredient_id]))
+                    (plan.before if item.step == "before" else plan.after).append(step)
                     continue
                 ml = amounts[item.ingredient_id]
-                if item.ingredient.manual:
-                    plan.manual.append(HandStep(item.ingredient.name, ml))
-                    continue
                 number = self._dispenser_for(s, item.ingredient)
                 plan.pumps[number] = plan.pumps.get(number, 0) + ml
             return plan
@@ -309,7 +314,7 @@ class Bot:
         self.current = plan
         self._set_state(State.POURING, plan.name)
         self._emit({"type": "pouring", "name": plan.name, "ml": round(plan.pumped_ml),
-                    "manual": [h.as_list() for h in plan.manual], "finish": plan.finish})
+                    "after": [h.as_list() for h in plan.after], "finish": plan.finish})
         with self.sessions() as s:
             cal = {n - 1: d.ticks_per_ml for n in plan.pumps
                    if (d := s.get(Dispenser, n)) is not None and d.ticks_per_ml}
@@ -330,7 +335,7 @@ class Bot:
                               size_ml=plan.pumped_ml))
                 s.commit()
         self._emit({"type": "done", "name": plan.name,
-                    "manual": [h.as_list() for h in plan.manual], "finish": plan.finish})
+                    "after": [h.as_list() for h in plan.after], "finish": plan.finish})
         self._check()
 
     def _reset(self) -> None:

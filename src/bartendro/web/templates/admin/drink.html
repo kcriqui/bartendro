@@ -26,12 +26,13 @@
   <label class="check"><input type="checkbox" name="popular" {% if drink.popular %}checked{% endif %}> In "the essentials"</label>
 
   <h3>Ingredients</h3>
-  <p class="hint">Amounts are parts of the mix ("2"), or ml / cl / oz ("30 ml"). "2 dash" (also drop,
-    barspoon, pinch, splash) is added by the guest after the pour.</p>
+  <p class="hint">Amounts are parts of the mix ("2"), or ml / cl / oz ("30 ml"). Counted amounts
+    ("2 dash", "6 leaf", "4 wedge", "2 tsp"...) and by-hand ingredients are added by the guest:
+    after the pour, or before it with "before" at the end ("1 dash before").</p>
   <table class="grid">
     {% for item in drink.items %}
     <tr><td>{{ ingredient_select(item.ingredient_id) }}</td>
-        <td><input name="parts" class="short" value="{{ item.hand_text if item.by_hand else ('%g' % item.parts) }}"></td></tr>
+        <td><input name="parts" class="short" value="{{ (item.hand_text if item.unit else '%g' % item.parts) ~ (' before' if item.by_hand and item.step == 'before' else '') }}"></td></tr>
     {% endfor %}
     {% for _ in range(blank_rows) %}
     <tr><td>{{ ingredient_select(None) }}</td><td><input name="parts" class="short"></td></tr>

@@ -151,7 +151,7 @@ def _import_ingredients(old: _Old, session: Session, report: Report) -> None:
         kind, manual = BOOZE_TYPES.get(old_type, (Kind.OTHER, False))
         session.add(Ingredient(id=r["id"], name=name, brand=_text(_get(r, "brand")),
                                description=_text(_get(r, "desc")), abv=float(_get(r, "abv", 0)),
-                               kind=kind, manual=manual))
+                               kind=kind, manual=manual, on_hand=manual))
         ids.add(r["id"])
     session.flush()
     report.counts["ingredients"] = len(ids)

@@ -16,11 +16,11 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import HAND_UNITS, Drink, Ingredient, Kind, RecipeItem
+from .models import HAND_UNITS, STEPS, Drink, Ingredient, Kind, RecipeItem
 
 SOURCE = "classics"
-UNITS_ML = {"ml": 1.0, "cl": 10.0, "oz": 29.57}  # poured by the pumps
-# HAND_UNITS (dash, drop, barspoon, pinch, splash): added by the guest after the pour
+UNITS_ML = {"ml": 1.0, "cl": 10.0, "oz": 29.57}  # measured (pumped, or by hand for manual ingredients)
+# HAND_UNITS (dash, leaf, wedge, tsp, ...): counted, always added by the guest
 
 
 class RecipeFileError(Exception):
@@ -50,22 +50,30 @@ def read(path: str | Path | None = None) -> dict:
 
 
 def _validate(data: dict, p: Path) -> None:
-    names = set()
+    names, manual = set(), set()
     for ing in data.get("ingredient", []):
         if not ing.get("name"):
             raise RecipeFileError(f"{p}: an [[ingredient]] has no name")
         if ing.get("kind", "other") not in {k.value for k in Kind}:
             raise RecipeFileError(f"{p}: {ing['name']}: unknown kind {ing['kind']!r}")
         names.add(ing["name"].lower())
+        if ing.get("manual"):
+            manual.add(ing["name"].lower())
+    for ing in data.get("ingredient", []):
+        if ing.get("generic") and ing["generic"].lower() not in names:
+            raise RecipeFileError(f"{p}: {ing['name']}: generic {ing['generic']!r} is not an [[ingredient]]")
     for d in data.get("drink", []):
         if not d.get("name") or not d.get("ingredients"):
             raise RecipeFileError(f"{p}: a [[drink]] needs a name and ingredients")
-        if len({str(i[-1]).lower() for i in d["ingredients"]}) != len(d["ingredients"]):
+        if len({str(i[2]).lower() for i in d["ingredients"] if len(i) >= 3}) != len(d["ingredients"]):
             raise RecipeFileError(f"{p}: {d['name']}: an ingredient is listed twice")
         for item in d["ingredients"]:
-            if len(item) != 3:
-                raise RecipeFileError(f"{p}: {d['name']}: ingredients are [amount, unit, name]")
-            amount, unit, name = item
+            if len(item) not in (3, 4):
+                raise RecipeFileError(f"{p}: {d['name']}: ingredients are [amount, unit, name] "
+                                      f"or [amount, unit, name, \"before\"/\"after\"]")
+            amount, unit, name = item[:3]
+            if len(item) == 4 and item[3] not in STEPS:
+                raise RecipeFileError(f"{p}: {d['name']}: {name}: step must be before or after")
             if unit not in UNITS_ML and unit not in HAND_UNITS:
                 raise RecipeFileError(f"{p}: {d['name']}: unit {unit!r} "
                                       f"(use {', '.join([*UNITS_ML, *HAND_UNITS])})")
@@ -73,27 +81,31 @@ def _validate(data: dict, p: Path) -> None:
                 raise RecipeFileError(f"{p}: {d['name']}: bad amount {amount!r}")
             if name.lower() not in names:
                 raise RecipeFileError(f"{p}: {d['name']}: {name!r} is not an [[ingredient]]")
-        if not any(unit in UNITS_ML for _, unit, _ in d["ingredients"]):
+        if not any(i[1] in UNITS_ML and i[2].lower() not in manual for i in d["ingredients"]):
             raise RecipeFileError(f"{p}: {d['name']}: nothing for the pumps to pour")
 
 
-def parse_amount(text: str) -> tuple[float | None, float | None, str]:
-    """Admin form entry -> (parts, amount, unit): "2" is 2 parts, "30 ml" / "1 oz" are parts in
-    ml, "2 dash" (dash, drop, barspoon, pinch, splash; plurals ok) is added by hand."""
+def parse_amount(text: str) -> tuple[float | None, float | None, str, str]:
+    """Admin form entry -> (parts, amount, unit, step): "2" is 2 parts, "30 ml" / "1 oz" are
+    parts in ml, "2 dash" (or leaf, wedge, tsp, ...; plurals ok) is counted and added by hand.
+    A trailing "before" / "after" says when a by-hand amount goes in (default after)."""
     words = text.strip().lower().split()
+    step = "after"
+    if words and words[-1] in STEPS:
+        step = words.pop()
     if not words or len(words) > 2:
-        raise ValueError(f"amount {text!r}: a number, optionally with a unit")
+        raise ValueError(f"amount {text!r}: a number, optionally a unit, then before/after")
     amount = float(words[0])
     if amount <= 0:
         raise ValueError(f"amount {text!r} must be more than 0")
     if len(words) == 1:
-        return amount, None, ""
+        return amount, None, "", step
     unit = words[1]
     singular = {v: k for k, v in HAND_UNITS.items()}.get(unit, unit)
     if singular in HAND_UNITS:
-        return None, amount, singular
+        return None, amount, singular, step
     if unit in UNITS_ML:
-        return amount * UNITS_ML[unit], amount, unit
+        return amount * UNITS_ML[unit], amount, unit, step
     raise ValueError(f"unit {unit!r}: use ml, cl, oz or {', '.join(HAND_UNITS)}")
 
 
@@ -120,7 +132,8 @@ def load(session: Session, path: str | Path | None = None, update: bool = False)
                 report.notes.append(f"using your {found.name!r} for {spec['name']!r}")
         else:
             found = Ingredient(name=spec["name"], kind=Kind(spec.get("kind", "other")),
-                               abv=float(spec.get("abv", 0)), manual=bool(spec.get("manual", False)))
+                               abv=float(spec.get("abv", 0)), manual=bool(spec.get("manual", False)),
+                               on_hand=False)  # tick it in Admin once you have it
             session.add(found)
             by_name[_norm(found.name)] = found
             report.counts["ingredients added"] += 1
@@ -129,6 +142,10 @@ def load(session: Session, path: str | Path | None = None, update: bool = False)
 
     for spec in data.get("ingredient", []):
         generic = resolved[_norm(spec["name"])]
+        if spec.get("generic"):  # e.g. Reposado Tequila -> Tequila
+            parent = resolved[_norm(spec["generic"])]
+            if generic.generic_id is None and not _is_ancestor(generic, parent):
+                generic.generic = parent
         for brand in spec.get("brands", []):
             ing = by_name.get(_norm(brand))
             if ing is None or ing is generic or ing.generic_id is not None:
@@ -158,13 +175,14 @@ def load(session: Session, path: str | Path | None = None, update: bool = False)
         drink.glass = spec.get("glass", "")
         # Pour the recipe as specified (a Godmother is 70 ml, not the default 150 ml glass);
         # the size buttons still scale it.
-        drink.size_ml = round(sum(a * UNITS_ML[u] for a, u, _ in spec["ingredients"] if u in UNITS_ML))
+        drink.size_ml = round(sum(i[0] * UNITS_ML[i[1]] for i in spec["ingredients"] if i[1] in UNITS_ML))
         drink.items.clear()
         session.flush()  # delete the old rows first: (drink, ingredient) is unique
-        drink.items = [RecipeItem(ingredient=resolved[_norm(name)],
-                                  parts=amount * UNITS_ML[unit] if unit in UNITS_ML else None,
-                                  amount=float(amount), unit=unit, position=n)
-                       for n, (amount, unit, name) in enumerate(spec["ingredients"])]
+        drink.items = [RecipeItem(ingredient=resolved[_norm(item[2])],
+                                  parts=item[0] * UNITS_ML[item[1]] if item[1] in UNITS_ML else None,
+                                  amount=float(item[0]), unit=item[1],
+                                  step=item[3] if len(item) == 4 else "after", position=n)
+                       for n, item in enumerate(spec["ingredients"])]
     session.commit()
     return report
 

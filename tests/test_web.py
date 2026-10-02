@@ -77,7 +77,7 @@ def test_classic_recipes_and_plan(env):
     assert "old fashioned glass" in page and "Over ice." in page
     plan = client.get(f"/api/drink/{godmother.id}/plan").json()  # Vodka #1, Amaretto #11
     assert {p["dispenser"] for p in plan["pumps"]} == {1, 11}
-    assert "One bottle away" in client.get("/admin").text
+    assert "One step away" in client.get("/admin").text
     plan_page = client.get("/admin/plan?pumps=3").text
     assert "With <b>" in plan_page
 
@@ -213,8 +213,11 @@ def test_hand_added_amounts_in_admin_and_plan(env):
         assert [(i.ingredient_id, i.parts, i.hand_text) for i in d.items] == \
             [(7, 50, "50 ml"), (1, None, "3 dashes")]
     plan = client.get(f"/api/drink/{manhattan}/plan").json()
+    assert "error" in plan and "on hand" in plan["error"]  # vodka isn't ticked "on hand"
+    client.post("/admin/on-hand", data={"listed": ["1"], "on_hand": ["1"]})
+    plan = client.get(f"/api/drink/{manhattan}/plan").json()
+    assert plan["after"] == [{"ingredient": "Vodka", "ml": None, "text": "3 dashes"}]
     assert plan["pumps"] == [{"dispenser": 15, "ingredient": "Whiskey", "ml": 50}]
-    assert plan["manual"] == [{"ingredient": "Vodka", "ml": None, "text": "3 dashes"}]
     assert plan["finish"] == "Stir."
     assert client.post(f"/admin/drink/{manhattan}", data={
         "name": "Manhattan", "ingredient": ["7"], "parts": ["2 pints"]}).status_code == 400

@@ -116,3 +116,5 @@ input.short { width: 6em; }
 .serve { color: var(--muted); font-size: .95em; }
 .serve .glass { display: inline-block; padding: 2px 8px; margin-right: 6px; border-radius: 8px;
                 background: var(--panel2); color: var(--text); font-size: .85em; }
+.checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 16px; margin: 8px 0 12px; }
+.checks label.check { display: flex; gap: 8px; align-items: center; }

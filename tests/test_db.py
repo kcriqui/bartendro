@@ -46,6 +46,67 @@ def test_downgrade_and_upgrade_again(tmp_path):
     upgrade(engine)
 
 
+def test_upgrade_keeps_data(tmp_path):
+    """Migrations rebuild tables on SQLite; rows in other tables that point at them (recipe
+    lines, dispensers, the pour log) must survive - no foreign key errors, no cascades."""
+    path = tmp_path / "m.db"
+    engine = make_engine(path)
+    upgrade(engine, "0001")
+    c = sqlite3.connect(path)
+    c.executescript("""
+        INSERT INTO ingredient (id, name, brand, description, abv, kind, manual, generic_id, generic_order)
+            VALUES (1, 'Vodka', '', '', 40, 'alcohol', 0, NULL, 0),
+                   (2, 'Titos', '', '', 40, 'alcohol', 0, 1, 0),
+                   (3, 'Mint', '', '', 0, 'other', 1, NULL, 0);
+        INSERT INTO drink (id, name, sort_name, description, popular, enabled, size_ml)
+            VALUES (1, 'Vodka Mint', '', '', 1, 1, NULL);
+        INSERT INTO recipe_item (id, drink_id, ingredient_id, parts, position)
+            VALUES (1, 1, 1, 2, 0), (2, 1, 3, 1, 1);
+        INSERT INTO dispenser (number, ingredient_id, level, ticks_per_ml) VALUES (1, 2, 'ok', 3.0);
+        INSERT INTO pour_log (id, time, drink_id, ingredient_id, size_ml)
+            VALUES (1, '2026-01-01 00:00:00', 1, NULL, 150), (2, '2026-01-01 00:01:00', NULL, 2, 30);
+        INSERT INTO option (key, value) VALUES ('metric', '1');
+    """)
+    c.commit()
+    c.close()
+    upgrade(engine)
+    c = sqlite3.connect(path)
+    assert c.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0004"
+    assert c.execute("SELECT count(*) FROM recipe_item").fetchone()[0] == 2
+    assert c.execute("SELECT drink_id FROM pour_log ORDER BY id").fetchall() == [(1,), (None,)]
+    assert c.execute("SELECT generic_id FROM ingredient WHERE id = 2").fetchone()[0] == 1
+    assert c.execute("SELECT ingredient_id, ticks_per_ml FROM dispenser").fetchall() == [(2, 3.0)]
+    assert c.execute("SELECT name, on_hand FROM ingredient ORDER BY id").fetchall() == \
+        [("Vodka", 0), ("Titos", 0), ("Mint", 1)]  # manual ones start on hand
+    assert c.execute("SELECT step FROM recipe_item").fetchall() == [("after",), ("after",)]
+    assert c.execute("PRAGMA foreign_key_check").fetchall() == []
+    assert not c.execute("SELECT name FROM sqlite_master WHERE name LIKE '_alembic_tmp%'").fetchall()
+
+
+def test_failed_migration_changes_nothing(tmp_path, monkeypatch):
+    path = tmp_path / "m.db"
+    engine = make_engine(path)
+    upgrade(engine, "0003")
+    with pytest.raises(RuntimeError, match="boom"):
+        # break the last step of 0004 half way through
+        from alembic.operations import Operations
+        real = Operations.batch_alter_table
+
+        def boom(self, table, **kw):
+            if table == "recipe_item":
+                raise RuntimeError("boom")
+            return real(self, table, **kw)
+        monkeypatch.setattr(Operations, "batch_alter_table", boom)
+        upgrade(engine)
+    monkeypatch.undo()
+    c = sqlite3.connect(path)
+    assert c.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0003"
+    cols = [r[1] for r in c.execute("PRAGMA table_info(ingredient)")]
+    assert "on_hand" not in cols  # the first half of 0004 was rolled back too
+    c.close()
+    upgrade(engine)  # and it still upgrades cleanly afterwards
+
+
 def test_upgrade_refuses_old_database(tmp_path):
     old = tmp_path / "old.db"
     old.write_bytes(DEFAULT_DB.read_bytes())
@@ -286,7 +347,7 @@ def test_scale_recipe_leaves_out_manual_ingredients(session):
 def test_dbcli(tmp_path, capsys):
     db = str(tmp_path / "cli.db")
     assert dbcli(["--db", db, "upgrade"]) == 0
-    assert "schema none -> 0003" in capsys.readouterr().out
+    assert "schema none -> 0004" in capsys.readouterr().out
     assert dbcli(["--db", db, "import", str(DEFAULT_DB)]) == 0
     assert "83 drinks" in capsys.readouterr().out
     assert dbcli(["--db", db, "import", str(DEFAULT_DB)]) == 2  # already has data

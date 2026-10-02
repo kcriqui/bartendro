@@ -107,31 +107,39 @@ def test_brand_on_dispenser_pours_generic_recipe(sessions):
 def test_manual_ingredients_are_listed_not_pumped(sessions):
     b, _ = make_bot(sessions)
     with sessions() as s:
-        mint = Ingredient(name="Mint", manual=True)
+        mint = Ingredient(name="Mint", manual=True, on_hand=True)
         vodka = s.get(Ingredient, 1)
         s.add(Drink(id=501, name="Minty", items=[RecipeItem(ingredient=vodka, parts=3, position=0),
                                                  RecipeItem(ingredient=mint, parts=1, position=1)]))
         s.commit()
     plan = b.make_drink(501, size_ml=100)
     assert plan.pumps == pytest.approx({1: 75})
-    assert [(h.ingredient, h.ml, h.text) for h in plan.manual] == [("Mint", 25, "")]
-    assert b.events[-2]["manual"] == [["Mint", 25, ""]]
+    assert [(h.ingredient, h.ml, h.text) for h in plan.after] == [("Mint", 25, "")]
+    assert b.events[-2]["after"] == [["Mint", 25, ""]]
 
 
 def test_hand_added_dashes_and_finish(sessions):
     b, bus = make_bot(sessions)
     with sessions() as s:
         bitters = Ingredient(name="Angostura", manual=True)  # not on any dispenser
+        absinthe = Ingredient(name="Absinthe", manual=True, on_hand=True)
         whiskey = s.scalar(select(Ingredient).where(Ingredient.name == "Whiskey"))  # dispenser #15
-        s.add(Drink(id=502, name="Old Fashioned", finish="Stir.", size_ml=45, items=[
-            RecipeItem(ingredient=whiskey, parts=45, position=0),
-            RecipeItem(ingredient=bitters, parts=None, amount=2, unit="dash", position=1)]))
+        s.add(Drink(id=502, name="Sazerac-ish", finish="Stir.", size_ml=45, items=[
+            RecipeItem(ingredient=absinthe, parts=None, amount=1, unit="dash", step="before", position=0),
+            RecipeItem(ingredient=whiskey, parts=45, position=1),
+            RecipeItem(ingredient=bitters, parts=None, amount=2, unit="dash", position=2)]))
+        s.commit()
+    with pytest.raises(CantPourError, match="Angostura isn't on hand"):
+        b.make_drink(502)
+    with sessions() as s:
+        s.scalar(select(Ingredient).where(Ingredient.name == "Angostura")).on_hand = True
         s.commit()
     plan = b.make_drink(502)
     assert plan.pumps == pytest.approx({15: 45})  # the dashes don't dilute the mix
-    assert [(h.ingredient, h.ml, h.text) for h in plan.manual] == [("Angostura", None, "2 dashes")]
+    assert [(h.ingredient, h.text) for h in plan.before] == [("Absinthe", "1 dash")]
+    assert [(h.ingredient, h.ml, h.text) for h in plan.after] == [("Angostura", None, "2 dashes")]
     done = b.events[-2]
-    assert done["type"] == "done" and done["manual"] == [["Angostura", None, "2 dashes"]]
+    assert done["type"] == "done" and done["after"] == [["Angostura", None, "2 dashes"]]
     assert done["finish"] == "Stir."
 
 

@@ -29,47 +29,97 @@ def drink(s, name):
 
 def test_bundled_file_is_valid_and_simple():
     data = recipes.read()
-    assert len(data["drink"]) >= 45
+    assert len(data["drink"]) >= 50
     manual = {i["name"] for i in data["ingredient"] if i.get("manual")}
     for d in data["drink"]:
-        # the bot pours a few liquids; the guest adds dashes and shakes/stirs after the pour
+        # the bot pours a few liquids; the guest does the rest by hand, before or after
         assert 2 <= len(d["ingredients"]) <= 8, d["name"]
-        total = sum(a * recipes.UNITS_ML[u] for a, u, _ in d["ingredients"] if u in recipes.UNITS_ML)
-        assert 45 <= total <= 250, d["name"]
-        for _, unit, name in d["ingredients"]:
-            assert (unit in recipes.UNITS_ML) == (name not in manual), (d["name"], name)  # dashes by hand
+        pumped = [(a, u, n) for a, u, n, *_ in d["ingredients"] if u in recipes.UNITS_ML and n not in manual]
+        hand = [n for a, u, n, *_ in d["ingredients"] if u not in recipes.UNITS_ML or n in manual]
+        assert pumped, d["name"]
+        assert 45 <= sum(a * recipes.UNITS_ML[u] for a, u, _ in pumped) <= 250, d["name"]
+        for a, u, n, *_ in d["ingredients"]:
+            if u not in recipes.UNITS_ML:
+                assert n in manual, (d["name"], n)  # counted amounts are never pumped
         text = (d.get("instructions", "") + " " + d.get("description", "")).lower()
-        for word in ("shake ", "stir", "strain", "muddle", "blend"):
+        for word in ("shake ", "strain", "blend"):
             assert word not in text, (d["name"], word)  # those belong in `finish`
-        hand = [n for _, u, n in d["ingredients"] if u not in recipes.UNITS_ML]
         if hand or "shaker" in text or "mixing glass" in text:
             assert d.get("finish"), d["name"]
+        before = [n for a, u, n, *step in d["ingredients"] if step == ["before"]]
+        if before:
+            assert d.get("instructions"), d["name"]  # say what to do with them
 
 
 def test_sazerac(session):
     recipes.load(session)
     saz = drink(session, "Sazerac")
     pumped = [(i.ingredient.name, i.parts) for i in saz.items if not i.by_hand]
-    by_hand = [(i.ingredient.name, i.hand_text) for i in saz.items if i.by_hand]
+    by_hand = [(i.ingredient.name, i.hand_text, i.step) for i in saz.items if i.by_hand]
     assert pumped == [("Rye Whiskey", 60), ("Simple Syrup", 7.5)]
-    assert by_hand == [("Peychaud's Bitters", "3 dashes"), ("Absinthe", "1 dash")]
-    assert saz.size_ml == 68 and "absinthe" in saz.finish.lower()
-    # makeable with rye and syrup on pumps: the bitters and absinthe don't need a dispenser
+    assert by_hand == [("Absinthe", "1 dash", "before"), ("Peychaud's Bitters", "3 dashes", "after")]
+    assert saz.size_ml == 68 and "absinthe" in saz.instructions.lower()
     session.add_all([Dispenser(number=1, ingredient=ing(session, "Rye Whiskey")),
                      Dispenser(number=2, ingredient=ing(session, "Simple Syrup"))])
+    session.commit()
+    # the bitters and absinthe need no dispenser, but must be on hand
+    assert "Sazerac" not in {d.name for d in makeable_drinks(session)}
+    away = {i.name: (by_hand, {d.name for d in ds}) for i, by_hand, ds in one_bottle_away(session, limit=50)}
+    assert "Sazerac" not in away.get("Absinthe", (None, set()))[1]  # needs two things
+    ing(session, "Absinthe").on_hand = True
+    session.commit()
+    away = {i.name: (by_hand, {d.name for d in ds}) for i, by_hand, ds in one_bottle_away(session, limit=50)}
+    assert away["Peychaud's Bitters"] == (True, {"Sazerac"})
+    ing(session, "Peychaud's Bitters").on_hand = True
     session.commit()
     assert "Sazerac" in {d.name for d in makeable_drinks(session)}
 
 
 def test_parse_amount():
-    assert recipes.parse_amount("2") == (2, None, "")
-    assert recipes.parse_amount("30 ml") == (30, 30, "ml")
-    assert recipes.parse_amount("1 oz") == (pytest.approx(29.57), 1, "oz")
-    assert recipes.parse_amount("3 dashes") == (None, 3, "dash")
-    assert recipes.parse_amount("1 Barspoon") == (None, 1, "barspoon")
-    for bad in ("", "lots", "2 pints", "0", "1 2 3"):
+    assert recipes.parse_amount("2") == (2, None, "", "after")
+    assert recipes.parse_amount("30 ml") == (30, 30, "ml", "after")
+    assert recipes.parse_amount("1 oz") == (pytest.approx(29.57), 1, "oz", "after")
+    assert recipes.parse_amount("3 dashes") == (None, 3, "dash", "after")
+    assert recipes.parse_amount("1 Barspoon") == (None, 1, "barspoon", "after")
+    assert recipes.parse_amount("6 leaves before") == (None, 6, "leaf", "before")
+    for bad in ("", "lots", "2 pints", "0", "1 2 3", "before"):
         with pytest.raises(ValueError):
             recipes.parse_amount(bad)
+
+
+def test_specific_spirits_are_not_replaced_by_generic(session):
+    recipes.load(session)
+    tequila, reposado = ing(session, "Tequila"), ing(session, "Reposado Tequila")
+    assert reposado.generic is tequila
+    for name in ("Agave Syrup",):
+        session.add(Dispenser(number=2, ingredient=ing(session, name)))
+    ing(session, "Angostura Bitters").on_hand = True
+    session.add(Dispenser(number=1, ingredient=tequila))
+    session.commit()
+    names = {d.name for d in makeable_drinks(session)}
+    assert "Tequila Old Fashioned" not in names  # asks for reposado: plain tequila won't do
+    session.get(Dispenser, 1).ingredient = reposado
+    session.commit()
+    names = {d.name for d in makeable_drinks(session)}
+    assert "Tequila Old Fashioned" in names
+    session.add(Dispenser(number=3, ingredient=ing(session, "Orange Juice")))
+    session.add(Dispenser(number=4, ingredient=ing(session, "Grenadine")))
+    session.commit()
+    assert "Tequila Sunrise" in {d.name for d in makeable_drinks(session)}  # reposado does for tequila
+
+
+def test_muddled_drinks_have_before_steps(session):
+    recipes.load(session)
+    mojito = drink(session, "Mojito")
+    before = [(i.ingredient.name, i.hand_text) for i in mojito.items if i.by_hand and i.step == "before"]
+    assert before == [("Mint", "6 leaves")]
+    caip = drink(session, "Caipirinha")
+    assert [(i.ingredient.name, i.hand_text) for i in caip.items if i.by_hand] == \
+        [("Lime", "4 wedges"), ("Sugar", "2 tsp")]
+    wr = drink(session, "White Russian")
+    cream = [i for i in wr.items if i.ingredient.name == "Half and Half"][0]
+    assert cream.by_hand and cream.parts == 30 and cream.step == "after"  # measured, by hand
+    assert ing(session, "Half and Half").manual and not ing(session, "Half and Half").on_hand
 
 
 def test_load_into_empty_database(session):
@@ -139,8 +189,9 @@ def test_bad_recipe_files(tmp_path):
 def test_suggest_bottles_for_a_small_bot(session):
     recipes.load(session)
     bottles, drinks = suggest_bottles(session, 3)
-    assert {b.name for b in bottles} == {"Vodka", "Orange Juice", "Cranberry Juice"}
-    assert {d.name for d in drinks} == {"Screwdriver", "Cape Cod", "Madras"}
+    assert len(bottles) == 3 and len(drinks) >= 3
+    needed = {i.ingredient_id for d in drinks for i in d.items if not i.by_hand}
+    assert needed <= {b.id for b in bottles}  # every suggested drink runs on those 3 pumps
     tequila = ing(session, "Tequila").id
     bottles, drinks = suggest_bottles(session, 3, keep=[tequila])
     assert bottles[0].name == "Tequila" and len(drinks) >= 1
@@ -151,7 +202,7 @@ def test_one_bottle_away(session):
     vodka = ing(session, "Vodka")
     session.add(Dispenser(number=1, ingredient=vodka))
     session.commit()
-    away = {i.name: {d.name for d in ds} for i, ds in one_bottle_away(session, limit=50)}
+    away = {i.name: {d.name for d in ds} for i, _, ds in one_bottle_away(session, limit=50)}
     assert away["Orange Juice"] == {"Screwdriver"}
     assert away["Tonic Water"] == {"Vodka Tonic"}
     assert "Gin" not in away  # gin drinks need more than one more bottle

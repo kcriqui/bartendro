@@ -12,7 +12,9 @@
   </select></label>
   <p class="hint">Strength changes alcohol; tartness raises tart and lowers sweet ingredients.</p>
   <label class="check"><input type="checkbox" name="manual" {% if ing.manual %}checked{% endif %}>
-    Added by hand (never pumped: garnish, ice, soda...)</label>
+    Added by hand (never pumped: bitters, mint, dairy...)</label>
+  <label class="check"><input type="checkbox" name="on_hand" {% if ing.on_hand %}checked{% endif %}>
+    On hand (the guest can add it by hand right now)</label>
   <label>A brand of <select name="generic_id">
     <option value="">(nothing - this is a generic ingredient)</option>
     {% for g in generics %}<option value="{{ g.id }}" {% if g.id == ing.generic_id %}selected{% endif %}>{{ g.name }}</option>{% endfor %}

@@ -1,11 +1,15 @@
 # Bundled drinks for Bartendro: `bartendro-db load-recipes` (or Admin > Drinks) adds them.
 #
-# The bot pours the liquids; the guest may finish the drink. Two kinds of drinks:
+# The bot pours the liquids; the guest may prepare the glass first and finish the drink after.
 #   - poured straight into a glass of ice: no `finish`
 #   - poured into a shaker or mixing glass, then shaken or stirred by the guest: `finish`
 #     says what to do after the pour.
-# Small hand-added amounts (a dash of bitters, a dash of absinthe) use the units dash, drop,
-# barspoon, pinch or splash: the pumps skip them and the guest is reminded after the pour.
+# By-hand lines are never pumped; the guest gets a checklist:
+#   - counted amounts: units dash, drop, barspoon, pinch, splash, tsp, leaf, sprig, wedge,
+#     slice, cube, piece ([2, "dash", "Angostura Bitters"])
+#   - measured amounts of `manual` ingredients ([30, "ml", "Half and Half"]), scaled with the glass
+#   - a 4th element "before" means before the pour (absinthe rinse, muddled mint); default "after".
+# Drinks only show on the menu when their by-hand ingredients are ticked "on hand" in Admin.
 #
 # Ingredient amounts are facts (classic and IBA specs, written in ml); the descriptions and
 # instructions were written for this project. GPL-2.0 like the rest of the code.
@@ -15,7 +19,9 @@
 #            database, e.g. names from an old bartendro.db), so nothing is duplicated.
 #   brands:  specific bottles that can stand in for it; an existing ingredient with one of
 #            these names is linked to it (Kahlua -> Coffee Liqueur) unless it already has a link.
-#   manual:  never on a pump (bitters, sauces).
+#   generic: this is a specific kind of another ingredient (Reposado Tequila -> Tequila): it can
+#            make drinks that ask for the generic one, but not the other way round.
+#   manual:  never on a pump (bitters, mint, dairy - too hard to clean out of the lines).
 # [[drink]]: ingredients = [[amount, unit, ingredient], ...]; pumped units ml, cl or oz.
 #   instructions: what to put under the spout ("Over ice.", "Pour into a shaker.")
 #   finish: what the guest does after the pour
@@ -49,25 +55,47 @@ abv = 40
 name = "Tequila"
 kind = "alcohol"
 abv = 40
-brands = ["Tequila, Silver", "Tequila, Gran Centenario", "Blanco Tequila", "Reposado Tequila"]
+brands = ["Tequila, Silver", "Tequila, Gran Centenario", "Blanco Tequila", "Silver Tequila"]
+
+[[ingredient]]
+name = "Reposado Tequila"
+kind = "alcohol"
+abv = 40
+generic = "Tequila"
+aliases = ["Tequila Reposado"]
+
+[[ingredient]]
+name = "Anejo Tequila"
+kind = "alcohol"
+abv = 40
+generic = "Tequila"
+aliases = ["Añejo Tequila", "Tequila Anejo", "Tequila Añejo"]
+
+[[ingredient]]
+name = "Cachaca"
+kind = "alcohol"
+abv = 40
+aliases = ["Cachaça"]
 
 [[ingredient]]
 name = "Whiskey"
 kind = "alcohol"
 abv = 40
 aliases = ["Whisky"]
-brands = ["Bourbon", "Rye Whiskey", "Jack Daniel's", "Jameson", "Scotch Whisky"]
+brands = ["Bourbon", "Jack Daniel's", "Jameson"]
 
 [[ingredient]]
 name = "Rye Whiskey"
 kind = "alcohol"
 abv = 45
+generic = "Whiskey"
 aliases = ["Rye"]
 
 [[ingredient]]
 name = "Scotch Whisky"
 kind = "alcohol"
 abv = 40
+generic = "Whiskey"
 aliases = ["Scotch"]
 
 [[ingredient]]
@@ -195,10 +223,6 @@ aliases = ["Agave Nectar"]
 name = "Tomato Juice"
 kind = "other"
 
-[[ingredient]]
-name = "Cream"
-kind = "other"
-aliases = ["Heavy Cream", "Fresh Cream"]
 
 # ------------------------------------------------------------------ mixers
 [[ingredient]]
@@ -262,6 +286,36 @@ name = "Hot Sauce"
 kind = "other"
 manual = true
 aliases = ["Tabasco"]
+
+[[ingredient]]
+name = "Cream"
+kind = "other"
+manual = true
+aliases = ["Heavy Cream", "Fresh Cream"]
+
+[[ingredient]]
+name = "Half and Half"
+kind = "other"
+manual = true
+aliases = ["Half & Half", "Half-and-Half"]
+
+[[ingredient]]
+name = "Mint"
+kind = "other"
+manual = true
+aliases = ["Mint Leaves", "Fresh Mint"]
+
+[[ingredient]]
+name = "Lime"
+kind = "other"
+manual = true
+aliases = ["Fresh Lime", "Lime Wedges"]
+
+[[ingredient]]
+name = "Sugar"
+kind = "other"
+manual = true
+aliases = ["White Sugar", "Caster Sugar"]
 
 # ================================================================== drinks
 
@@ -359,7 +413,8 @@ glass = "old fashioned"
 popular = true
 description = "Vodka, coffee liqueur and cream."
 instructions = "Over ice."
-ingredients = [[50, "ml", "Vodka"], [20, "ml", "Coffee Liqueur"], [30, "ml", "Cream"]]
+finish = "Float the cream on top, or stir it in."
+ingredients = [[50, "ml", "Vodka"], [20, "ml", "Coffee Liqueur"], [30, "ml", "Half and Half"]]
 
 [[drink]]
 name = "Godmother"
@@ -662,7 +717,35 @@ ingredients = [[45, "ml", "Whiskey"], [30, "ml", "Campari"], [30, "ml", "Sweet V
 name = "Sazerac"
 glass = "old fashioned"
 description = "Rye, sugar and Peychaud's bitters in an absinthe-rinsed glass. New Orleans' own."
-instructions = "Pour into a mixing glass."
-finish = "Swirl the absinthe around a chilled glass and pour it out. Add the bitters to the mixing glass, stir with ice and strain into the rinsed glass. Lemon peel over the top."
-ingredients = [[60, "ml", "Rye Whiskey"], [7.5, "ml", "Simple Syrup"], [3, "dash", "Peychaud's Bitters"],
-               [1, "dash", "Absinthe"]]
+instructions = "Swirl the absinthe around a chilled glass and pour out the excess, then pour into that glass."
+finish = "Add the bitters and stir. Lemon peel over the top."
+ingredients = [[1, "dash", "Absinthe", "before"], [60, "ml", "Rye Whiskey"], [7.5, "ml", "Simple Syrup"],
+               [3, "dash", "Peychaud's Bitters"]]
+
+[[drink]]
+name = "Tequila Old Fashioned"
+glass = "old fashioned"
+description = "An Old Fashioned made with reposado tequila and agave."
+instructions = "Over ice."
+finish = "Add the bitters and stir a few times. An orange peel if you have one."
+ingredients = [[60, "ml", "Reposado Tequila"], [7.5, "ml", "Agave Syrup"], [2, "dash", "Angostura Bitters"]]
+
+# ------------------------------------------------------------------ the guest muddles first
+
+[[drink]]
+name = "Mojito"
+glass = "highball"
+popular = true
+description = "Rum, lime, sugar, mint and soda."
+instructions = "Gently muddle the mint in the glass, then fill it with ice."
+finish = "Stir gently. A mint sprig on top if you have one."
+ingredients = [[6, "leaf", "Mint", "before"], [45, "ml", "White Rum"], [20, "ml", "Lime Juice"],
+               [15, "ml", "Simple Syrup"], [60, "ml", "Soda Water"]]
+
+[[drink]]
+name = "Caipirinha"
+glass = "old fashioned"
+description = "Cachaca with muddled lime and sugar. Brazil's national cocktail."
+instructions = "Muddle the lime wedges with the sugar in the glass, then fill it with crushed ice."
+finish = "Stir well."
+ingredients = [[4, "wedge", "Lime", "before"], [2, "tsp", "Sugar", "before"], [60, "ml", "Cachaca"]]
