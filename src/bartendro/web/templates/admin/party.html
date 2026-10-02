@@ -1,0 +1,50 @@
+{% extends "admin/layout.html" %}
+{% set tab = "parties" %}
+{% block title %}{{ p.name or "New party" }} - {{ bot_name }}{% endblock %}
+{% block admin %}
+{% if request.query_params.get("saved") %}<p class="hint">Saved. <a href="/?party={{ p.id }}">Preview it</a></p>{% endif %}
+<form method="post" action="/admin/party/{{ p.id if p.id else 'new' }}" enctype="multipart/form-data" class="form">
+  <label>Name (for you) <input name="name" value="{{ p.name or '' }}" required></label>
+  <label>Title in the header <input name="title" value="{{ p.title or '' }}" placeholder="Kevin's 40th"></label>
+  <label>Welcome line above the menu <input name="welcome" value="{{ p.welcome or '' }}"
+         placeholder="Drinks on the robot - tip your bartender!"></label>
+
+  <h3>Colours</h3>
+  <div class="checks">
+    {% for key, label in [("page", "Page background"), ("frame", "Frame"), ("heading", "Headings"),
+                          ("button", "Drink buttons"), ("go", "Pour buttons")] %}
+    <label class="check"><input type="color" name="color_{{ key }}" value="{{ colors[key] }}"> {{ label }}</label>
+    {% endfor %}
+  </div>
+  <p class="hint">Leave a colour as it is to keep the original Bartendro look for that part.</p>
+
+  <h3>Logo</h3>
+  {% if p.logo %}<p><img src="/uploads/{{ p.logo }}" alt="" style="max-height:60px"><br>
+    <label class="check"><input type="checkbox" name="remove_logo"> Remove it (back to the Bartendro logo)</label></p>{% endif %}
+  <input type="file" name="logo" accept="image/*">
+
+  <h3>Drinks</h3>
+  <p class="hint">Tick drinks to give this party its own menu (leave all unticked for every drink).
+    &#9733; = in "the essentials" (up to 4, in "order" order). Drinks that can't be made with the
+    bottles on the pumps are hidden from guests until they can.</p>
+  {% for section, drinks in sections.items() %}
+  <h4>{{ section }}</h4>
+  <table class="grid">
+    {% for d in drinks %}{% set pd = listed.get(d.id) %}
+    <tr>
+      <td><label class="check"><input type="checkbox" name="drink" value="{{ d.id }}" {% if pd %}checked{% endif %}>
+        {{ d.name }}</label>{% if d.id not in can %} <span class="muted">can't make now</span>{% endif %}</td>
+      <td><label class="check" title="in the essentials"><input type="checkbox" name="featured" value="{{ d.id }}"
+          {% if pd and pd.featured %}checked{% endif %}> &#9733;</label></td>
+      <td><input name="pos{{ d.id }}" class="short" inputmode="numeric" value="{{ pd.position if pd else '' }}"
+          placeholder="order" aria-label="order"></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endfor %}
+  <div class="button-row">
+    <button class="btn primary">Save</button>
+    <a class="btn plain" href="/admin/parties">Back</a>
+  </div>
+</form>
+{% endblock %}

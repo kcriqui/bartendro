@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -21,18 +22,24 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
+from starlette.datastructures import UploadFile
 
 from .. import __version__
 from ..bot import Bot, BusyError, CantPourError
 from ..db import options
 from ..db import recipes
 from ..db.menu import by_category, makeable_drinks, one_bottle_away, sort_key, suggest_bottles
-from ..db.models import Dispenser, Drink, Ingredient, Kind, PourLog, RecipeItem, utcnow
+from ..db.models import (Dispenser, Drink, Ingredient, Kind, Party, PartyDrink, PourLog, RecipeItem,
+                         utcnow)
+from .theme import DEFAULTS as THEME_DEFAULTS, theme_css, valid as valid_color
 
 log = logging.getLogger(__name__)
 HERE = Path(__file__).parent
 ML_PER_OZ = 29.57  # the old UI used 30
 SIZE_STEP_ML = 30  # drink size +/- buttons (old size_increment)
+PREVIEW_COOKIE = "preview_party"
+LOGO_TYPES = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+MAX_LOGO_BYTES = 2_000_000
 ESSENTIALS = 4     # drinks in "the essentials": two rows of two
 
 
@@ -59,8 +66,13 @@ class CleanRequest(BaseModel):
     which: str = "all"
 
 
-def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
+def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = None) -> FastAPI:
+    """`uploads`: folder for party logos (default: "uploads" next to the database)."""
     sessions = bot.sessions
+    if uploads is None:
+        db_file = sessions.kw["bind"].url.database
+        uploads = Path(db_file).resolve().parent / "uploads"
+    uploads.mkdir(parents=True, exist_ok=True)
     clients: set[asyncio.Queue] = set()
 
     @asynccontextmanager
@@ -80,24 +92,48 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
 
     app = FastAPI(title="Bartendro", version=__version__, lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+    app.mount("/uploads", StaticFiles(directory=uploads), name="uploads")
     templates = Jinja2Templates(directory=HERE / "templates")
+
+    def current_party(request: Request, s) -> Party | None:
+        """The party being previewed (?party=<id>, remembered in a cookie; 0 = none), else the
+        active one."""
+        preview = request.query_params.get("party", request.cookies.get(PREVIEW_COOKIE))
+        if preview is not None and preview.isdigit():
+            return s.get(Party, int(preview)) if int(preview) else None
+        return s.scalar(select(Party).where(Party.active))
 
     def page(request: Request, name: str, **ctx):
         with sessions() as s:
             opts = options.get_all(s)
-        metric = opts["metric"]
+            party = current_party(request, s)
+            metric = opts["metric"]
 
-        def amount(ml: float) -> str:
-            return f"{ml:.0f} ml" if metric else f"{ml / ML_PER_OZ:.1f} oz"
-        path = request.url.path
-        nav = "admin" if path.startswith("/admin") else "shots" if path.startswith("/shots") else "drinks"
-        return templates.TemplateResponse(request, name, {
-            "bot_name": bot_name, "status": bot.status(), "opts": opts, "amount": amount,
-            "version": __version__, "nav": nav, "party": None, "theme_css": "", **ctx})
+            def amount(ml: float) -> str:
+                return f"{ml:.0f} ml" if metric else f"{ml / ML_PER_OZ:.1f} oz"
+            path = request.url.path
+            nav = "admin" if path.startswith("/admin") else "shots" if path.startswith("/shots") else "drinks"
+            response = templates.TemplateResponse(request, name, {
+                "bot_name": bot_name, "status": bot.status(), "opts": opts, "amount": amount,
+                "version": __version__, "nav": nav, "party": party, "theme_css": theme_css(party), **ctx})
+        preview = request.query_params.get("party")
+        if preview is not None and preview.isdigit():
+            if int(preview):
+                response.set_cookie(PREVIEW_COOKIE, preview, max_age=3600)
+            else:
+                response.delete_cookie(PREVIEW_COOKIE)
+        return response
 
-    def guest_drinks(s) -> tuple[list[Drink], list[Drink]]:
-        """(drinks guests can order now, the featured ones for "the essentials")."""
+    def guest_drinks(s, request: Request) -> tuple[list[Drink], list[Drink]]:
+        """(drinks guests can order now, the featured ones for "the essentials"). With a party
+        drink list: only those, featured = the party's picks in its order."""
         drinks = makeable_drinks(s, dispenser_count=bot.dispenser_count)
+        party = current_party(request, s)
+        if party is not None and party.drinks:
+            listed = {pd.drink_id: pd for pd in party.drinks}
+            drinks = [d for d in drinks if d.id in listed]
+            featured = sorted((d for d in drinks if listed[d.id].featured), key=lambda d: listed[d.id].position)
+            return drinks, featured[:ESSENTIALS]
         return drinks, [d for d in drinks if d.popular][:ESSENTIALS]
 
     # ------------------------------------------------------------------ errors
@@ -115,14 +151,14 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
     @app.get("/")
     def menu(request: Request):
         with sessions() as s:
-            drinks, essentials = guest_drinks(s)
+            drinks, essentials = guest_drinks(s, request)
             sections = [(name, slugify(name), len(ds)) for name, ds in by_category(drinks).items()]
             return page(request, "menu.html", essentials=essentials, sections=sections, total=len(drinks))
 
     @app.get("/menu/{slug}")
     def menu_section(request: Request, slug: str):
         with sessions() as s:
-            drinks, _ = guest_drinks(s)
+            drinks, _ = guest_drinks(s, request)
             if slug == "all":
                 title, chosen = "All drinks", sorted(drinks, key=sort_key)
             else:
@@ -375,6 +411,95 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
                 .group_by(Ingredient.name).order_by(func.count().desc())).all()
             total = s.scalar(select(func.sum(PourLog.size_ml)).where(PourLog.time >= since)) or 0
             return page(request, "admin/log.html", rows=rows, shots=shots, days=days, total=total)
+
+    # ------------------------------------------------------------------ parties
+
+    @app.get("/admin/parties")
+    def admin_parties(request: Request):
+        with sessions() as s:
+            parties = s.scalars(select(Party).order_by(func.lower(Party.name))).all()
+            return page(request, "admin/parties.html", parties=parties)
+
+    @app.get("/admin/party/{party_id}")
+    def admin_party(request: Request, party_id: str):
+        with sessions() as s:
+            party = Party(name="", title="", welcome="", drinks=[]) if party_id == "new" \
+                else s.get(Party, int(party_id))
+            if party is None:
+                return RedirectResponse("/admin/parties", status_code=303)
+            listed = {pd.drink_id: pd for pd in party.drinks}
+            all_drinks = s.scalars(select(Drink).options(selectinload(Drink.items))
+                                   .where(Drink.enabled)).all()
+            can = {d.id for d in makeable_drinks(s, dispenser_count=bot.dispenser_count)}
+            colors = {k: getattr(party, f"color_{k}") or v for k, v in THEME_DEFAULTS.items()}
+            return page(request, "admin/party.html", p=party, listed=listed, can=can, colors=colors,
+                        sections=by_category(list(all_drinks)), slugify=slugify)
+
+    @app.post("/admin/party/{party_id}")
+    async def save_party(request: Request, party_id: str):
+        form = await request.form()
+        with sessions() as s:
+            party = Party(drinks=[]) if party_id == "new" else s.get(Party, int(party_id))
+            if party is None:
+                return RedirectResponse("/admin/parties", status_code=303)
+            party.name = str(form.get("name", "")).strip() or "Party"
+            party.title = str(form.get("title", "")).strip()
+            party.welcome = str(form.get("welcome", "")).strip()
+            for key, default in THEME_DEFAULTS.items():
+                color = valid_color(str(form.get(f"color_{key}", "")))
+                setattr(party, f"color_{key}", "" if color in ("", default) else color)
+            logo = form.get("logo")
+            if form.get("remove_logo"):
+                party.logo = ""
+            elif isinstance(logo, UploadFile) and logo.filename:
+                suffix = Path(logo.filename).suffix.lower()
+                data = await logo.read()
+                if suffix not in LOGO_TYPES or len(data) > MAX_LOGO_BYTES:
+                    return JSONResponse({"error": f"logo must be {', '.join(sorted(LOGO_TYPES))} "
+                                                  f"and under {MAX_LOGO_BYTES // 1_000_000} MB"}, status_code=400)
+                name = f"logo-{secrets.token_hex(6)}{suffix}"
+                (uploads / name).write_bytes(data)
+                party.logo = name
+            chosen = [int(i) for i in form.getlist("drink")]
+            featured = {int(i) for i in form.getlist("featured")}
+
+            def position(drink_id: int) -> int:
+                try:
+                    return int(form.get(f"pos{drink_id}") or 0)
+                except ValueError:
+                    return 0
+            s.add(party)
+            party.drinks.clear()
+            s.flush()
+            party.drinks = [PartyDrink(drink_id=i, featured=i in featured, position=position(i))
+                            for i in chosen]
+            s.commit()
+            return RedirectResponse(f"/admin/party/{party.id}?saved=1", status_code=303)
+
+    @app.post("/admin/party/{party_id}/{action}")
+    def party_action(party_id: int, action: str):
+        with sessions() as s:
+            party = s.get(Party, party_id)
+            if party is None:
+                return RedirectResponse("/admin/parties", status_code=303)
+            if action == "activate":
+                for other in s.scalars(select(Party).where(Party.active)):
+                    other.active = False
+                party.active = True
+            elif action == "deactivate":
+                party.active = False
+            elif action == "duplicate":
+                copy = Party(name=f"{party.name} (copy)", title=party.title, welcome=party.welcome,
+                             logo=party.logo, **{f"color_{k}": getattr(party, f"color_{k}") for k in THEME_DEFAULTS},
+                             drinks=[PartyDrink(drink_id=pd.drink_id, featured=pd.featured, position=pd.position)
+                                     for pd in party.drinks])
+                s.add(copy)
+            elif action == "delete":
+                s.delete(party)
+            else:
+                return JSONResponse({"error": f"unknown action {action}"}, status_code=400)
+            s.commit()
+        return RedirectResponse("/admin/parties", status_code=303)
 
     # ------------------------------------------------------------------ JSON API
 

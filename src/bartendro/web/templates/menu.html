@@ -20,6 +20,7 @@
        <br><a href="/admin">Check the bottles</a></p>
   </div>
 {% else %}
+  {% if party and party.welcome %}<p class="welcome">{{ party.welcome }}</p>{% endif %}
   {% if essentials %}
     <h1>the essentials</h1>
     {{ drink_list(essentials, "essentials") }}

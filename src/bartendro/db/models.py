@@ -207,3 +207,39 @@ class PourLog(Base):
     drink_id: Mapped[int | None] = mapped_column(ForeignKey("drink.id", ondelete="SET NULL"))
     ingredient_id: Mapped[int | None] = mapped_column(ForeignKey("ingredient.id"))  # shots
     size_ml: Mapped[float] = mapped_column(Float)
+
+
+class Party(Base):
+    """A party's look and drink list. At most one is active; with a drink list, guests only see
+    those drinks (still only the ones that can be made). Colours are "#rrggbb" or "" for the
+    original Bartendro look."""
+    __tablename__ = "party"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    title: Mapped[str] = mapped_column(String(100), default="")    # shown in the header
+    welcome: Mapped[str] = mapped_column(Text, default="")         # shown above the essentials
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    color_page: Mapped[str] = mapped_column(String(7), default="")
+    color_frame: Mapped[str] = mapped_column(String(7), default="")
+    color_heading: Mapped[str] = mapped_column(String(7), default="")
+    color_button: Mapped[str] = mapped_column(String(7), default="")
+    color_go: Mapped[str] = mapped_column(String(7), default="")
+    logo: Mapped[str] = mapped_column(String(100), default="")     # file name in the uploads folder
+
+    drinks: Mapped[list[PartyDrink]] = relationship(back_populates="party", cascade="all, delete-orphan",
+                                                    order_by="PartyDrink.position")
+
+
+class PartyDrink(Base):
+    __tablename__ = "party_drink"
+    __table_args__ = (UniqueConstraint("party_id", "drink_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    party_id: Mapped[int] = mapped_column(ForeignKey("party.id", ondelete="CASCADE"), index=True)
+    drink_id: Mapped[int] = mapped_column(ForeignKey("drink.id", ondelete="CASCADE"))
+    featured: Mapped[bool] = mapped_column(Boolean, default=False)  # in "the essentials"
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+    party: Mapped[Party] = relationship(back_populates="drinks")
+    drink: Mapped[Drink] = relationship()

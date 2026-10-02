@@ -2,6 +2,7 @@ import time
 from pathlib import Path
 
 import pytest
+from markupsafe import escape
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -9,7 +10,7 @@ from bartendro import bot as bot_mod
 from bartendro.bot import Bot
 from bartendro.db import open_db, options
 from bartendro.db.importer import import_legacy
-from bartendro.db.models import Dispenser, Drink, Ingredient
+from bartendro.db.models import Dispenser, Drink, Ingredient, Party
 from bartendro.hw.driver import Driver
 from bartendro.hw.simulator import SimBus
 from bartendro.web import create_app
@@ -233,3 +234,78 @@ def test_hand_added_amounts_in_admin_and_plan(env):
     assert plan["finish"] == "Stir."
     assert client.post(f"/admin/drink/{manhattan}", data={
         "name": "Manhattan", "ingredient": ["7"], "parts": ["2 pints"]}).status_code == 400
+
+
+def drink_ids(sessions, *names):
+    with sessions() as s:
+        return [s.scalar(select(Drink.id).where(Drink.name == n)) for n in names]
+
+
+def test_parties(env, tmp_path):
+    client, b, _, sessions = env
+    br, cc, sd = drink_ids(sessions, "Black Russian", "Cape Cod", "Screwdriver")
+    assert client.get("/admin/parties").status_code == 200
+    assert client.get("/admin/party/new").status_code == 200
+    r = client.post("/admin/party/new", data={
+        "name": "Birthday", "title": "Kevin's 40th", "welcome": "Tip your robot!",
+        "color_page": "#102030", "color_button": "#fa6c19",  # the default: stored as ""
+        "drink": [str(br), str(cc), str(sd)], "featured": [str(cc), str(br)],
+        f"pos{cc}": "1", f"pos{br}": "2"},
+        files={"logo": ("logo.png", b"\x89PNG fake", "image/png")}, follow_redirects=False)
+    assert r.status_code == 303
+    with sessions() as s:
+        party = s.scalar(select(Party))
+        assert (party.title, party.color_page, party.color_button) == ("Kevin's 40th", "#102030", "")
+        assert {(pd.drink_id, pd.featured) for pd in party.drinks} == {(br, True), (cc, True), (sd, False)}
+        pid, logo = party.id, party.logo
+    assert logo.endswith(".png") and client.get(f"/uploads/{logo}").content == b"\x89PNG fake"
+
+    # not active yet: guests see everything, original look
+    title = str(escape("Kevin's 40th"))  # as the page escapes it
+    menu = client.get("/").text
+    assert title not in menu and "--page: #102030" not in menu
+    # preview: the party's look and menu, remembered by a cookie
+    menu = client.get(f"/?party={pid}").text
+    assert title in menu and "Tip your robot!" in menu and "--page: #102030" in menu
+    assert f"/uploads/{logo}" in menu
+    essentials = menu.split("the essentials")[1].split("the menu")[0]
+    assert essentials.index("Cape Cod") < essentials.index("Black Russian")  # party order
+    assert "Screwdriver" not in essentials  # on the list but not featured
+    everything = client.get("/menu/all").text  # cookie keeps the preview
+    assert "Screwdriver" in everything and "White Russian" not in everything
+    client.get("/?party=0")
+    assert "White Russian" in client.get("/menu/all").text
+
+    # activate: everyone gets it; only one party active at a time
+    client.post(f"/admin/party/{pid}/duplicate")
+    with sessions() as s:
+        copy_id = s.scalar(select(Party.id).where(Party.name == "Birthday (copy)"))
+        assert len(s.get(Party, copy_id).drinks) == 3
+    client.post(f"/admin/party/{pid}/activate")
+    client.post(f"/admin/party/{copy_id}/activate")
+    with sessions() as s:
+        assert [p.id for p in s.scalars(select(Party).where(Party.active))] == [copy_id]
+    assert "White Russian" not in client.get("/menu/all").text
+    client.post(f"/admin/party/{copy_id}/deactivate")
+    assert "White Russian" in client.get("/menu/all").text
+
+    # bad logo; delete; deleting a drink drops it from party lists
+    r = client.post(f"/admin/party/{pid}", data={"name": "Birthday"},
+                    files={"logo": ("evil.exe", b"MZ", "application/octet-stream")})
+    assert r.status_code == 400
+    client.post(f"/admin/drink/{sd}", data={"delete": "1"})
+    with sessions() as s:
+        assert len(s.get(Party, copy_id).drinks) == 2
+    client.post(f"/admin/party/{copy_id}/delete")
+    with sessions() as s:
+        assert s.get(Party, copy_id) is None
+
+
+def test_theme_css():
+    from bartendro.web.theme import darker, lighter, theme_css
+    assert theme_css(None) == "" and theme_css(Party(color_page="", color_frame="", color_heading="",
+                                                      color_button="", color_go="")) == ""
+    css = theme_css(Party(color_page="#000000", color_frame="#ff0000", color_heading="nope",
+                          color_button="#336699", color_go=""))
+    assert "--page: #000000;" in css and "--frame-inner: " + darker("#ff0000") in css
+    assert "--heading" not in css and "--btn-1: " + lighter("#336699") in css and "--go" not in css
