@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block backdrop %}{% if sections %}{% include "_robot_bg.html" %}{% endif %}{% endblock %}
 {% block content %}
 {% macro drink_list(drinks, cls="") %}
 <div class="drinks {{ cls }}">
@@ -20,8 +21,10 @@
        <br><a href="/admin">Check the bottles</a></p>
   </div>
 {% else %}
-  {% if party and party.logo %}<img class="party-art" src="/uploads/{{ party.logo }}" alt="">{% endif %}
-  {% if party and party.welcome %}<p class="welcome">{{ party.welcome }}</p>{% endif %}
+  {% if party and party.logo %}<img class="party-art" src="/uploads/{{ party.logo }}" alt="">
+    {% if party.welcome %}<p class="welcome">{{ party.welcome }}</p>{% endif %}
+  {% elif party and party.welcome %}<p class="welcome">{{ party.welcome }}</p>
+  {% endif %}
   {% if essentials %}
     <h1>the essentials</h1>
     {{ drink_list(essentials, "essentials") }}

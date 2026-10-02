@@ -44,6 +44,10 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    the old templates to build/old-ui for comparison); menu = "the essentials" (2 rows) + a
    button per category (/menu/<section>); parties (theme + drink list, one active, preview with
    ?party=<id>); admin drink editor with live preview, pump cards that save on change.
+   Menus: the party's logo as a banner on top, and the party robot big and faded behind the menus
+   (`_robot_bg.html` / `.robot-bg`; the drawing is `templates/_robot.html`: the original
+   partyrobot.png traced to inline SVG by `scripts/trace_robot.py` - re-run, don't hand-edit),
+   coloured by --robot / --robot-tray / --robot-drink / --robot-dots (party colours: tray <- frame, drink + dots <- button; web/theme.py).
    A drink with several spirits is in each spirit's section (Long Island: Vodka, Tequila, Rum,
    Gin); spirits are recognised by name (`menu.SPIRIT_WORDS`), not ABV - old dbs have wrong ABVs.
    Hosted demo for colleagues: TrueNAS app `bartendro-demo` (port 8077, simulated pumps, resets

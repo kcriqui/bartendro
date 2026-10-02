@@ -40,11 +40,12 @@ def theme_css(party: Party | None) -> str:
     if c := valid(party.color_page):
         rules.append(f"--page: {c};")
     if c := valid(party.color_frame):
-        rules += [f"--frame: {c};", f"--frame-inner: {darker(c)};"]
+        rules += [f"--frame: {c};", f"--frame-inner: {darker(c)};", f"--robot-tray: {lighter(c, .35)};"]
     if c := valid(party.color_heading):
         rules += [f"--heading: {c};", f"--edge: {lighter(c)};"]
     if c := valid(party.color_button):
-        rules += [f"--btn-1: {lighter(c)};", f"--btn-2: {c};"]
+        rules += [f"--btn-1: {lighter(c)};", f"--btn-2: {c};", f"--robot-drink: {lighter(c, .35)};",
+                  f"--robot-dots: {c};"]
     if c := valid(party.color_go):
         rules += [f"--go-1: {lighter(c, .2)};", f"--go-2: {c};"]
     return ":root { " + " ".join(rules) + " }" if rules else ""
