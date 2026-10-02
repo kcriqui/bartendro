@@ -43,6 +43,8 @@ PREVIEW_COOKIE = "preview_party"
 LOGO_TYPES = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
 MAX_LOGO_BYTES = 2_000_000
 ESSENTIALS = 4     # drinks in "the essentials": two rows of two
+ROBOTS = {"": "Bartendro party robot", "bar2d2": "Bar2D2 (astromech dome on a Dalek)"}  # Party.robot
+MARQUEE_MAX = 200
 
 
 def guest_event(event: dict) -> dict:
@@ -526,7 +528,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
                                    .where(Drink.enabled)).all()
             can = {d.id for d in makeable_drinks(s, dispenser_count=bot.dispenser_count)}
             colors = {k: getattr(party, f"color_{k}") or v for k, v in THEME_DEFAULTS.items()}
-            return page(request, "admin/party.html", p=party, listed=listed, can=can, colors=colors,
+            return page(request, "admin/party.html", p=party, listed=listed, can=can, colors=colors, robots=ROBOTS,
                         sections=by_category(list(all_drinks), every_section=False), slugify=slugify)
 
     @app.post("/admin/party/{party_id}")
@@ -539,6 +541,9 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             party.name = str(form.get("name", "")).strip() or "Party"
             party.title = str(form.get("title", "")).strip()
             party.welcome = str(form.get("welcome", "")).strip()
+            robot = str(form.get("robot", ""))
+            party.robot = robot if robot in ROBOTS else ""
+            party.marquee = " ".join(str(form.get("marquee", "")).split())[:MARQUEE_MAX]
             for key, default in THEME_DEFAULTS.items():
                 color = valid_color(str(form.get(f"color_{key}", "")))
                 setattr(party, f"color_{key}", "" if color in ("", default) else color)
@@ -586,7 +591,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
                 party.active = False
             elif action == "duplicate":
                 copy = Party(name=f"{party.name} (copy)", title=party.title, welcome=party.welcome,
-                             logo=party.logo, **{f"color_{k}": getattr(party, f"color_{k}") for k in THEME_DEFAULTS},
+                             logo=party.logo, robot=party.robot, marquee=party.marquee, **{f"color_{k}": getattr(party, f"color_{k}") for k in THEME_DEFAULTS},
                              drinks=[PartyDrink(drink_id=pd.drink_id, featured=pd.featured, position=pd.position)
                                      for pd in party.drinks])
                 s.add(copy)

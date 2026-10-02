@@ -1,0 +1,166 @@
+{# Bar2D2 (the Bar2D2 party): an astromech dome on a Dalek skirt whose bumps are peristaltic pumps,
+   balancing a tray with a martini glass on its plunger like the party robot. Drawn for this
+   project. Colours are --b2-* variables with defaults. #}
+<svg class="robot-art" viewBox="-14 -4 314 379" role="img" aria-label="Bar2D2 robot">
+  <defs>
+    <linearGradient id="b2-dome" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef1f5"/>
+      <stop offset=".55" stop-color="var(--b2-dome, #c3c9d2)"/>
+      <stop offset="1" stop-color="#8d96a3"/>
+    </linearGradient>
+    <linearGradient id="b2-body" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d9dee5"/>
+      <stop offset=".35" stop-color="var(--b2-body, #f5f7fa)"/>
+      <stop offset="1" stop-color="#c4cbd4"/>
+    </linearGradient>
+    <clipPath id="b2-dome-clip"><path d="M80 110 A70 70 0 0 1 220 110 Z"/></clipPath>
+    <!-- a peristaltic pump head, centred on 0,0 -->
+    <g id="b2-pump">
+      <circle r="15.5" fill="var(--b2-dark, #343a43)" stroke="#15181d" stroke-width="2"/>
+      <circle r="12.6" fill="#59626e"/>
+      <path d="M-9.6 15 V4 A10.2 10.2 0 1 1 9.6 4 V15" fill="none" stroke="#15181d" stroke-width="5.4"
+            stroke-linecap="round"/>
+      <path d="M-9.6 15 V4 A10.2 10.2 0 1 1 9.6 4 V15" fill="none" stroke="var(--b2-tube, #f2c76b)"
+            stroke-width="3.2" stroke-linecap="round"/>
+      <g stroke="#d5dbe2" stroke-width="2.4" stroke-linecap="round">
+        <line x2="0" y2="-7.4"/><line x2="6.4" y2="3.7"/><line x2="-6.4" y2="3.7"/>
+      </g>
+      <g fill="#eef1f5" stroke="#15181d" stroke-width="1.1">
+        <circle cy="-7.4" r="2.8"/><circle cx="6.4" cy="3.7" r="2.8"/><circle cx="-6.4" cy="3.7" r="2.8"/>
+      </g>
+      <circle r="2.6" fill="var(--b2-blue, #2a5db0)" stroke="#15181d" stroke-width="1"/>
+      <path d="M-11 -5 A12 12 0 0 1 -3 -12" fill="none" stroke="#fff" stroke-width="1.6" opacity=".45"
+            stroke-linecap="round"/>
+    </g>
+  </defs>
+
+  <ellipse cx="150" cy="366" rx="128" ry="7" fill="#000" opacity=".12"/>
+  <g transform="rotate(-3 150 350)">
+  <g fill="#dcdcdc" stroke="#1d2128" stroke-width="3.2">
+    <circle cx="128" cy="22" r="6.5"/><circle cx="180" cy="11" r="8.5"/>
+  </g>
+  <g fill="#fff" opacity=".9"><circle cx="125.8" cy="19.8" r="1.8"/><circle cx="177" cy="8" r="2.3"/></g>
+
+  <!-- olive-pick arm (the gun stick) -->
+  <g stroke-linecap="round">
+    <line x1="226" y1="142" x2="276" y2="128" stroke="#1d2128" stroke-width="8"/>
+    <line x1="226" y1="142" x2="276" y2="128" stroke="#c3c9d2" stroke-width="4"/>
+    <g fill="#c3c9d2" stroke="#1d2128" stroke-width="1.5">
+      <ellipse cx="244" cy="137" rx="2.2" ry="5.5" transform="rotate(-16 244 137)"/>
+      <ellipse cx="254" cy="134.2" rx="2.2" ry="5.5" transform="rotate(-16 254 134.2)"/>
+      <ellipse cx="264" cy="131.4" rx="2.2" ry="5.5" transform="rotate(-16 264 131.4)"/>
+    </g>
+    <ellipse cx="283" cy="125" rx="8.5" ry="7" fill="#7f9c3c" stroke="#1d2128" stroke-width="2"/>
+    <circle cx="286" cy="124" r="2.8" fill="#d8402f"/>
+  </g>
+
+  <!-- the Dalek plunger arm, balancing a tray with a martini glass on its suction cup -->
+  <g stroke-linecap="round">
+    <path d="M74 140 Q58 136 44 122" fill="none" stroke="#1d2128" stroke-width="11"/>
+    <path d="M74 140 Q58 136 44 122" fill="none" stroke="#c3c9d2" stroke-width="5.5"/>
+  </g>
+  <g transform="translate(44 124) rotate(-12)">
+    <path d="M-17 -22 Q-16 -7 -6 0 H6 Q16 -7 17 -22 Z" fill="var(--b2-plunger, #3b3f46)" stroke="#1d2128"
+          stroke-width="3.2" stroke-linejoin="round"/>
+    <path d="M-15.5 -12 Q0 -8 15.5 -12" fill="none" stroke="#1d2128" stroke-width="2" opacity=".7"/>
+    <path d="M-10 -17 Q-10 -8 -4 -3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".5"/>
+  </g>
+  <g transform="rotate(-9 38 97)">
+    <ellipse cx="38" cy="98" rx="31" ry="7.5" fill="var(--b2-tray, #9db9de)" stroke="#1d2128" stroke-width="3.2"/>
+    <ellipse cx="38" cy="96.5" rx="11" ry="2.6" fill="#1d2128" opacity=".85"/>
+    <path d="M38 95 V73" stroke="#1d2128" stroke-width="3.2" stroke-linecap="round"/>
+    <!-- 3D martini glass, like the party robot's: tipped towards us, white inside wall above the drink -->
+    <g transform="rotate(-14 38 73)">
+      <path d="M15 46 L38 73 L61 46 A23 8.5 0 0 1 15 46 Z" fill="var(--b2-drink, #f3a96c)" stroke="#1d2128"
+            stroke-width="3.2" stroke-linejoin="round"/>
+      <path d="M21 52 L34.5 68" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".55"/>
+      <ellipse cx="38" cy="46" rx="23" ry="8.5" fill="#fff" stroke="#1d2128" stroke-width="3.2"/>
+      <ellipse cx="38" cy="48.8" rx="19" ry="5.2" fill="var(--b2-drink, #f3a96c)"/>
+    </g>
+  </g>
+
+  <!-- skirt -->
+  <path d="M70 172 H230 L266 346 H34 Z" fill="url(#b2-body)" stroke="#1d2128" stroke-width="3.8" stroke-linejoin="round"/>
+  <path d="M70 172 H84 L56 346 H34 Z M230 172 H216 L244 346 H266 Z" fill="var(--b2-blue, #2a5db0)" opacity=".9"/>
+  <!-- panel lines, and pumps where a Dalek has its bumps -->
+  <g stroke="#9aa3ad" stroke-width="1.6">
+    <line x1="110.0" y1="172" x2="92.0" y2="346"/>
+    <line x1="150.0" y1="172" x2="150.0" y2="346"/>
+    <line x1="190.0" y1="172" x2="208.0" y2="346"/>
+  </g>
+  <use href="#b2-pump" x="86.0" y="198" transform="translate(86.0 198) scale(.85) translate(-86.0 -198)"/>
+  <use href="#b2-pump" x="128.7" y="198" transform="translate(128.7 198) scale(.85) translate(-128.7 -198)"/>
+  <use href="#b2-pump" x="171.3" y="198" transform="translate(171.3 198) scale(.85) translate(-171.3 -198)"/>
+  <use href="#b2-pump" x="214.0" y="198" transform="translate(214.0 198) scale(.85) translate(-214.0 -198)"/>
+  <use href="#b2-pump" x="79.3" y="241" transform="translate(79.3 241) scale(.85) translate(-79.3 -241)"/>
+  <use href="#b2-pump" x="126.4" y="241" transform="translate(126.4 241) scale(.85) translate(-126.4 -241)"/>
+  <use href="#b2-pump" x="173.6" y="241" transform="translate(173.6 241) scale(.85) translate(-173.6 -241)"/>
+  <use href="#b2-pump" x="220.7" y="241" transform="translate(220.7 241) scale(.85) translate(-220.7 -241)"/>
+  <use href="#b2-pump" x="72.6" y="284" transform="translate(72.6 284) scale(.85) translate(-72.6 -284)"/>
+  <use href="#b2-pump" x="124.2" y="284" transform="translate(124.2 284) scale(.85) translate(-124.2 -284)"/>
+  <use href="#b2-pump" x="175.8" y="284" transform="translate(175.8 284) scale(.85) translate(-175.8 -284)"/>
+  <use href="#b2-pump" x="227.4" y="284" transform="translate(227.4 284) scale(.85) translate(-227.4 -284)"/>
+  <use href="#b2-pump" x="65.9" y="327" transform="translate(65.9 327) scale(.85) translate(-65.9 -327)"/>
+  <use href="#b2-pump" x="122.0" y="327" transform="translate(122.0 327) scale(.85) translate(-122.0 -327)"/>
+  <use href="#b2-pump" x="178.0" y="327" transform="translate(178.0 327) scale(.85) translate(-178.0 -327)"/>
+  <use href="#b2-pump" x="234.1" y="327" transform="translate(234.1 327) scale(.85) translate(-234.1 -327)"/>
+  <rect x="26" y="344" width="248" height="15" rx="4" fill="var(--b2-dark, #343a43)" stroke="#1d2128" stroke-width="3.2"/>
+
+  <!-- midsection: slatted shoulders -->
+  <path d="M78 119 H222 L230 173 H70 Z" fill="var(--b2-blue, #2a5db0)" stroke="#1d2128" stroke-width="3.8" stroke-linejoin="round"/>
+  <g stroke="#e9edf2" stroke-width="4.5" stroke-linecap="round">
+    <line x1="92" y1="126" x2="90" y2="165"/><line x1="106" y1="126" x2="105" y2="165"/>
+    <line x1="120" y1="126" x2="120" y2="165"/><line x1="134" y1="126" x2="134" y2="165"/>
+    <line x1="148" y1="126" x2="148" y2="165"/><line x1="162" y1="126" x2="162" y2="165"/>
+    <line x1="176" y1="126" x2="176" y2="165"/><line x1="190" y1="126" x2="190" y2="165"/>
+    <line x1="204" y1="126" x2="205" y2="165"/><line x1="216" y1="126" x2="218" y2="165"/>
+  </g>
+  <circle cx="74" cy="140" r="9" fill="var(--b2-dark, #343a43)" stroke="#1d2128" stroke-width="3.2"/>
+  <circle cx="226" cy="142" r="9" fill="var(--b2-dark, #343a43)" stroke="#1d2128" stroke-width="3.2"/>
+  <rect x="74" y="107" width="152" height="14" rx="4" fill="var(--b2-dark, #343a43)" stroke="#1d2128" stroke-width="3.2"/>
+
+  <!-- ear lamps -->
+  <g stroke="#1d2128" stroke-width="2">
+    <g transform="rotate(-45 100.5 60.5)">
+      <rect x="96" y="44" width="9" height="16" rx="2" fill="#c3c9d2"/>
+      <ellipse cx="100.5" cy="44" rx="6" ry="4" fill="var(--b2-lamp, #ffb547)"/>
+    </g>
+    <g transform="rotate(45 199.5 60.5)">
+      <rect x="195" y="44" width="9" height="16" rx="2" fill="#c3c9d2"/>
+      <ellipse cx="199.5" cy="44" rx="6" ry="4" fill="var(--b2-lamp, #ffb547)"/>
+    </g>
+  </g>
+  <!-- dome -->
+  <path d="M80 110 A70 70 0 0 1 220 110 Z" fill="url(#b2-dome)" stroke="#1d2128" stroke-width="3.8"/>
+  <g clip-path="url(#b2-dome-clip)" fill="var(--b2-blue, #2a5db0)">
+    <rect x="80" y="93" width="140" height="3" fill="#8d96a3"/>
+    <rect x="88" y="97" width="17" height="11"/><rect x="113" y="97" width="10" height="11"/>
+    <rect x="131" y="97" width="22" height="11"/><rect x="161" y="97" width="10" height="11"/>
+    <rect x="179" y="97" width="17" height="11"/><rect x="204" y="97" width="12" height="11"/>
+    <path d="M156 50 L184 54 L182 82 L156 82 Z"/>
+    <rect x="102" y="66" width="13" height="13" rx="1.5"/>
+    <path d="M128 42 L146 41 L146 52 L128 53 Z"/>
+  </g>
+  <path d="M100 76 A54 54 0 0 1 138 47" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/>
+  <path d="M116 89 Q117 95 123 94.5 Q150 96 176 86.5" fill="none" stroke="#1d2128" stroke-width="3.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- radar eye and logic light -->
+  <circle cx="132" cy="80" r="11" fill="#14171c" stroke="#1d2128" stroke-width="3.2"/>
+  <circle cx="132" cy="80" r="6.5" fill="#2b313a"/>
+  <circle cx="128.5" cy="76.5" r="2.6" fill="#fff" opacity=".85"/>
+  <circle cx="169" cy="66" r="3.4" fill="var(--b2-lamp, #ffb547)" stroke="#1d2128" stroke-width="1.5"/>
+  <circle cx="122" cy="102" r="2.5" fill="#d8402f"/>
+  <!-- eyestalk -->
+  <g stroke-linecap="round">
+    <line x1="182" y1="88" x2="228" y2="77" stroke="#1d2128" stroke-width="7"/>
+    <line x1="182" y1="88" x2="228" y2="77" stroke="#c3c9d2" stroke-width="3.5"/>
+  </g>
+  <g fill="#c3c9d2" stroke="#1d2128" stroke-width="1.5">
+    <ellipse cx="198" cy="84.2" rx="2" ry="6.5" transform="rotate(-13 198 84.2)"/>
+    <ellipse cx="208" cy="81.8" rx="2" ry="6.5" transform="rotate(-13 208 81.8)"/>
+    <ellipse cx="218" cy="79.4" rx="2" ry="6.5" transform="rotate(-13 218 79.4)"/>
+  </g>
+  <ellipse cx="232" cy="76" rx="5.5" ry="10" transform="rotate(-13 232 76)" fill="#1d2128"/>
+  <ellipse cx="233" cy="75.7" rx="3.4" ry="7" transform="rotate(-13 233 75.7)" fill="var(--b2-eye, #7fd3ff)"/>
+  </g>
+</svg>

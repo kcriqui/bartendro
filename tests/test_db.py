@@ -71,7 +71,7 @@ def test_upgrade_keeps_data(tmp_path):
     c.close()
     upgrade(engine)
     c = sqlite3.connect(path)
-    assert c.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0006"
+    assert c.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0007"
     assert c.execute("SELECT name, kind, alcoholic FROM ingredient ORDER BY id").fetchall() == \
         [("Vodka", "other", 1), ("Titos", "other", 1), ("Mint", "other", 0)]  # kind alcohol -> alcoholic
     assert c.execute("SELECT count(*) FROM recipe_item").fetchone()[0] == 2
@@ -352,7 +352,7 @@ def test_scale_recipe_leaves_out_manual_ingredients(session):
 def test_dbcli(tmp_path, capsys):
     db = str(tmp_path / "cli.db")
     assert dbcli(["--db", db, "upgrade"]) == 0
-    assert "schema none -> 0006" in capsys.readouterr().out
+    assert "schema none -> 0007" in capsys.readouterr().out
     assert dbcli(["--db", db, "import", str(DEFAULT_DB)]) == 0
     assert "83 drinks" in capsys.readouterr().out
     assert dbcli(["--db", db, "import", str(DEFAULT_DB)]) == 2  # already has data

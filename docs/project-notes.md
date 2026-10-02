@@ -107,3 +107,20 @@ Kevin's reference picture of the happy party robot: [images/happy-robot.avif](im
 own copy, `ui/content/static/images/partyrobot.png`, by `scripts/trace_robot.py` - a hand-drawn
 copy wasn't close enough. It sits big behind the menus (40% opacity, outlines lighter than the
 colours); party colours repaint it: tray <- frame colour, drink and dots <- button colour.
+
+## Bar2D2 party (2026-10-02)
+
+Kevin's third party theme: **Bar2D2**, a robot that's a cross between R2-D2 and a Dalek - astromech
+dome with radar eye and blue panels, Dalek eyestalk, ear lamps, slatted shoulders and skirt, with
+peristaltic pumps (all the same size, spaced like a Dalek's bumps - the count doesn't matter) where the
+bumps are. Like the party robot it balances a tray with a 3D martini glass (the party robot's orange,
+#f3a96c) - on the Dalek's plunger - and has bubbles, chunky outlines, a smile and a lean. The other arm
+is an olive pick. Drawn by hand as SVG: `src/bartendro/web/templates/_bar2d2.html`.
+Party settings: robot = bar2d2, R2 colours (frame/buttons #2a5db0, headings #1f3f7a, pour #d8402f), and
+instead of a banner image an **LED sign** - a scrolling rainbow dot-matrix with settable text, default
+"My Name is Bar2D2, I think I love you ;)". Both are per-party settings any party can use (Admin >
+Parties: "Robot behind the menus", "LED sign text"; migration 0007).
+LED sign font (2026-10-02): the classic 5x7 Adafruit GFX font (`static/led-font.js`, BSD - keep the
+notice), doubled with Scale2x to 2x2 LEDs per font dot (16 LED rows). Kevin: "a little too much
+smoothing but OK for now" - he'll look for reference fonts later; a bitmap font drawn for 16 rows
+would replace the font + scale2x step in app.js `ledSign`.

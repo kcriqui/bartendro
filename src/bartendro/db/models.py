@@ -226,6 +226,10 @@ class Party(Base):
     color_button: Mapped[str] = mapped_column(String(7), default="")
     color_go: Mapped[str] = mapped_column(String(7), default="")
     logo: Mapped[str] = mapped_column(String(100), default="")     # file name in the uploads folder
+    # which robot sits behind the menus: "" = the Bartendro party robot, or one of ROBOTS (web/)
+    robot: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    # text scrolling on an LED sign at the top of the menu ("" = no sign)
+    marquee: Mapped[str] = mapped_column(String(200), default="", server_default="")
 
     drinks: Mapped[list[PartyDrink]] = relationship(back_populates="party", cascade="all, delete-orphan",
                                                     order_by="PartyDrink.position")

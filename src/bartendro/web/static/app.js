@@ -295,6 +295,95 @@ const Bartendro = (() => {
     }
   }
 
+  // ---------------------------------------------------------------- LED sign (party marquee)
+  // A scrolling RGB dot-matrix sign in the classic 5x7 LED font (static/led-font.js, from the
+  // Adafruit GFX Library), doubled with Scale2x: every font pixel becomes 2x2 LEDs and the steps
+  // on diagonals and curves are filled in, so letters come out rounder. Every lit LED is coloured
+  // from a rainbow that drifts along as the text moves.
+  function scale2x(src, h) {                  // src: one bit-column per x (bit y); h rows -> 2h rows
+    const at = (x, y) => (x >= 0 && x < src.length && y >= 0 && y < h ? (src[x] >> y) & 1 : 0);
+    const out = new Array(src.length * 2).fill(0);
+    for (let x = 0; x < src.length; x++) {
+      for (let y = 0; y < h; y++) {
+        const p = at(x, y), a = at(x, y - 1), b = at(x + 1, y), c = at(x - 1, y), d = at(x, y + 1);
+        const e = [p, p, p, p];               // top-left, top-right, bottom-left, bottom-right
+        if (c === a && c !== d && a !== b) e[0] = a;
+        if (a === b && a !== c && b !== d) e[1] = b;
+        if (d === c && d !== b && c !== a) e[2] = c;
+        if (b === d && b !== a && d !== c) e[3] = d;
+        out[2 * x] |= (e[0] << (2 * y)) | (e[2] << (2 * y + 1));
+        out[2 * x + 1] |= (e[1] << (2 * y)) | (e[3] << (2 * y + 1));
+      }
+    }
+    return out;
+  }
+  function ledSign(canvas) {
+    const ROWS = 16, PAD = 1;                  // the font's 8 rows (7 + descenders) doubled, a dark row above/below
+    const font = window.LED_FONT_5X7 || "";
+    const glyph = (ch) => {
+      let code = ch.charCodeAt(0);
+      if (code < 32 || code > 126) code = 63;  // "?" for anything the font doesn't have
+      const at = (code - 32) * 10;
+      return [0, 1, 2, 3, 4].map((i) => parseInt(font.substr(at + i * 2, 2), 16) || 0);
+    };
+    const small = [];                           // one byte per column of the whole message
+    for (const ch of canvas.dataset.text || "") small.push(...glyph(ch), 0);
+    const columns = scale2x(small, 8);          // ...and at double resolution
+    const ctx = canvas.getContext("2d");
+    const slow = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let cols = 0, pitch = 0, step = 0, last = 0;
+
+    const unlit = document.createElement("canvas");   // the dark LEDs, drawn once per size
+
+    function size() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = unlit.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = unlit.height = Math.round(canvas.clientHeight * dpr);
+      pitch = canvas.height / (ROWS + 2 * PAD);
+      cols = Math.floor(canvas.width / pitch);
+      const u = unlit.getContext("2d");
+      u.fillStyle = "#0b0b0f";
+      u.fillRect(0, 0, unlit.width, unlit.height);
+      u.fillStyle = "#1b1b22";
+      u.beginPath();
+      for (let c = 0; c < cols; c++) {
+        for (let row = 0; row < ROWS + 2 * PAD; row++) {
+          u.moveTo(x0() + c * pitch + pitch * 0.4, (row + 0.5) * pitch);
+          u.arc(x0() + c * pitch, (row + 0.5) * pitch, pitch * 0.4, 0, 2 * Math.PI);
+        }
+      }
+      u.fill();
+    }
+    const x0 = () => (canvas.width - cols * pitch) / 2 + pitch / 2;
+    function draw() {                          // the dark board, then only the lit LEDs on top
+      const loop = columns.length + cols;       // the text, then a blank screen's width
+      ctx.drawImage(unlit, 0, 0);
+      const r = pitch * 0.4, left = x0();
+      for (let c = 0; c < cols; c++) {
+        const sx = ((step + c) % loop) - cols;   // message column under this LED (< 0: the gap)
+        const bits = sx >= 0 ? columns[sx] : 0;
+        if (!bits) continue;
+        ctx.fillStyle = `hsl(${(sx * 3 - step * 3) % 360}, 100%, 62%)`;
+        ctx.beginPath();
+        for (let row = 0; row < ROWS; row++) {
+          if (!((bits >> row) & 1)) continue;
+          const x = left + c * pitch, y = (row + PAD + 0.5) * pitch;
+          ctx.moveTo(x + r, y);
+          ctx.arc(x, y, r, 0, 2 * Math.PI);
+        }
+        ctx.fill();
+      }
+    }
+    function frame(t) {                        // redraw only when the text moves (easy on a Pi)
+      if (t - last > (slow ? 120 : 35)) { step++; last = t; draw(); }
+      requestAnimationFrame(frame);
+    }
+    size();
+    window.addEventListener("resize", () => { size(); draw(); });
+    requestAnimationFrame(frame);              // starts blank; the text comes in from the right
+  }
+  document.querySelectorAll("canvas.led-sign").forEach(ledSign);
+
   showStatus(window.BARTENDRO.status);
   connect();
   return { drinkPage, drinkEditor, filterTable, pumpCards, toast, post };

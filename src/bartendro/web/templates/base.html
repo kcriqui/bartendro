@@ -51,6 +51,7 @@
 </div>
 <div id="toast" class="toast" hidden></div>
 <script>window.BARTENDRO = {{ {"status": status, "metric": opts.metric} | tojson }};</script>
+{% if party and party.marquee %}<script src="/static/led-font.js"></script>{% endif %}
 <script src="/static/app.js"></script>
 {% block scripts %}{% endblock %}
 </body>

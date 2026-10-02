@@ -414,3 +414,28 @@ def test_guest_names():
                                   "after": [["Angostura Bitters", None, "2 dashes"]], "finish": ""}
     assert guest_event({"state": "pouring", "pouring": "Martini, Dry"})["pouring"] == "Dry Martini"
     assert event["name"] == "Margarita, Tommy's"   # the bot's event isn't changed
+
+
+def test_party_robot_and_led_sign(env):
+    client, b, _, sessions = env
+    r = client.post("/admin/party/new", data={"name": "Bar2D2", "robot": "bar2d2",
+                                               "marquee": "  My Name is Bar2D2,\n I think I love you ;)  "},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    with sessions() as s:
+        party = s.scalar(select(Party))
+        assert (party.robot, party.marquee) == ("bar2d2", "My Name is Bar2D2, I think I love you ;)")
+        pid = party.id
+    assert 'name="robot"' in client.get(f"/admin/party/{pid}").text
+    menu = client.get(f"/?party={pid}").text
+    assert 'class="led-sign"' in menu and "I think I love you ;)" in menu and "/static/led-font.js" in menu
+    assert 'aria-label="Bar2D2 robot"' in menu and "Bartendro robot" not in menu
+    client.post(f"/admin/party/{pid}/duplicate")
+    with sessions() as s:
+        copy = s.scalars(select(Party).order_by(Party.id.desc())).first()
+        assert (copy.robot, copy.marquee) == ("bar2d2", "My Name is Bar2D2, I think I love you ;)")
+    # an unknown robot falls back to the party robot
+    client.post(f"/admin/party/{pid}", data={"name": "Bar2D2", "robot": "hal9000", "marquee": ""})
+    menu = client.get(f"/?party={pid}").text
+    assert 'aria-label="Bartendro robot"' in menu and 'class="led-sign"' not in menu
+    client.get("/?party=0")

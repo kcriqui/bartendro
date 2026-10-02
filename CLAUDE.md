@@ -49,6 +49,9 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    (`_robot_bg.html` / `.robot-bg`; the drawing is `templates/_robot.html`: the original
    partyrobot.png traced to inline SVG by `scripts/trace_robot.py` - re-run, don't hand-edit),
    coloured by --robot / --robot-tray / --robot-drink / --robot-dots (party colours: tray <- frame, drink + dots <- button; web/theme.py).
+   A party picks its robot (`Party.robot`, web `ROBOTS`: "" = party robot, "bar2d2" = `_bar2d2.html`,
+   hand-drawn SVG) and can have an LED sign (`Party.marquee`: rainbow dot-matrix text scrolling at the
+   top of the menu, drawn on a canvas by app.js `ledSign`).
    A drink with several spirits is in each spirit's section (Long Island: Vodka, Tequila, Rum,
    Gin); spirits are recognised by name (`menu.SPIRIT_WORDS`), not ABV - old dbs have wrong ABVs.
    Hosted demo for colleagues: TrueNAS app `bartendro-demo` (port 8077, simulated pumps, resets

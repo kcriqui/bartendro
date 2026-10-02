@@ -1,3 +1,5 @@
-{# The party robot, big and faded, behind the drink menus. `side`: "right" to keep it clear of
-   buttons on the left (shots). #}
-<div class="robot-bg{{ (' ' ~ side) if side is defined and side }}" aria-hidden="true">{% include "_robot.html" %}</div>
+{# The party's robot (Party.robot), big and faded, behind the drink menus. `side`: "right" to keep it
+   clear of buttons on the left (shots). #}
+<div class="robot-bg{{ (' ' ~ side) if side is defined and side }}" aria-hidden="true">
+{%- if party and party.robot == "bar2d2" %}{% include "_bar2d2.html" %}{% else %}{% include "_robot.html" %}{% endif -%}
+</div>

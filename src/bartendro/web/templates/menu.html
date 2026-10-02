@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{# the robot fills the panel - or, under a party's banner, just the part below it #}
-{% block backdrop %}{% if sections and not (party and party.logo) %}{% include "_robot_bg.html" %}{% endif %}{% endblock %}
+{# the robot fills the panel - or, under a party's banner / LED sign, just the part below it #}
+{% set topper = party and (party.logo or party.marquee) %}
+{% block backdrop %}{% if sections and not topper %}{% include "_robot_bg.html" %}{% endif %}{% endblock %}
 {% block content %}
 {% macro drink_list(drinks, cls="") %}
 <div class="drinks {{ cls }}">
@@ -22,12 +23,12 @@
        <br><a href="/admin">Check the bottles</a></p>
   </div>
 {% else %}
-  {% if party and party.logo %}<img class="party-art" src="/uploads/{{ party.logo }}" alt="">
-    {% if party.welcome %}<p class="welcome">{{ party.welcome }}</p>{% endif %}
-  {% elif party and party.welcome %}<p class="welcome">{{ party.welcome }}</p>
-  {% endif %}
+  {% if party and party.logo %}<img class="party-art" src="/uploads/{{ party.logo }}" alt="">{% endif %}
+  {% if party and party.marquee %}<canvas class="led-sign" data-text="{{ party.marquee }}" role="img"
+    aria-label="{{ party.marquee }}"></canvas>{% endif %}
+  {% if party and party.welcome %}<p class="welcome">{{ party.welcome }}</p>{% endif %}
   <div class="menu-body">
-  {% if party and party.logo %}{% include "_robot_bg.html" %}{% endif %}
+  {% if topper %}{% include "_robot_bg.html" %}{% endif %}
   {% if essentials %}
     <h1>the essentials</h1>
     {{ drink_list(essentials, "essentials") }}

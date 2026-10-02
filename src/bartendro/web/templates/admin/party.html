@@ -18,6 +18,15 @@
   </div>
   <p class="hint">Leave a colour as it is to keep the original Bartendro look for that part.</p>
 
+  <h3>Robot and LED sign</h3>
+  <label>Robot behind the menus
+    <select name="robot">{% for key, label in robots.items() %}
+      <option value="{{ key }}" {% if (p.robot or '') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+  <label>LED sign text (scrolls across the top of the menu; leave empty for no sign)
+    <input name="marquee" value="{{ p.marquee or '' }}" maxlength="200"
+           placeholder="My Name is Bar2D2, I think I love you ;)"></label>
+
   <h3>Logo</h3>
   {% if p.logo %}<p><img src="/uploads/{{ p.logo }}" alt="" style="max-height:60px"><br>
     <label class="check"><input type="checkbox" name="remove_logo"> Remove it (back to the Bartendro logo)</label></p>{% endif %}
