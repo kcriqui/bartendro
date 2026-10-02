@@ -29,8 +29,11 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    and against the firmware's pack7.c (500 packets identical). **Next step: run it on a real
    bot** (docs/pi-setup.md, "What to check on real hardware") and fix what turns up.
 2. **Database** - done 2026-10-01: SQLAlchemy 2 + Alembic on SQLite, importer for old
-   `bartendro.db` files (checked against `ui/bartendro.db.default`), per-bot TOML config,
-   `bartendro-db` CLI. Still to do: import Kevin's real `bartendro.db` files from the bots' SD cards.
+   `bartendro.db` files (`--no-logs --no-settings` for recipes + bottles only), per-bot TOML
+   config, `bartendro-db` CLI. **The bot database is `build/bartendro.db`** (2026-10-02): Lunarville's
+   recipes + bottles + the bundled drinks + 6 from the old default db, 216 drinks, drink_size 100.
+   How it was merged and what Kevin chose: docs/project-notes.md "Bot database". Old dbs rename
+   drinks ("Margarita, SND", "zzz ..." = retired), so match on description/recipe, not just name.
 3. **Web app** - first version done 2026-10-01, tested with the simulator only: FastAPI +
    Jinja templates + ~200 lines of plain JS (no htmx: the hotspot has no internet to fetch it),
    WebSocket pour status to every screen. No login (Kevin's call): anyone on the bot's WiFi
@@ -41,6 +44,12 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    the old templates to build/old-ui for comparison); menu = "the essentials" (2 rows) + a
    button per category (/menu/<section>); parties (theme + drink list, one active, preview with
    ?party=<id>); admin drink editor with live preview, pump cards that save on change.
+   A drink with several spirits is in each spirit's section (Long Island: Vodka, Tequila, Rum,
+   Gin); spirits are recognised by name (`menu.SPIRIT_WORDS`), not ABV - old dbs have wrong ABVs.
+   Hosted demo for colleagues: TrueNAS app `bartendro-demo` (port 8077, simulated pumps, resets
+   on restart) public via Tailscale Funnel - docs/hosting.md + docs/project-notes.md. It only
+   gets new code when redeployed in TrueNAS. The static GitHub Pages demo was removed (don't
+   bring it back unasked).
 4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 62 drinks (7 non-alcoholic)
    written for this project (amounts are facts from classic/IBA specs; no copied text - the
    GitHub IBA datasets are scrapes of IBA's site + Wikipedia, so not bundled; TheCocktailDB must
@@ -70,6 +79,14 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
      per-pump calibration offset (ticks = a*ml + b). Needs real pumps to tune.
 5. Install script / systemd service, NetworkManager hotspot, optional Chromium kiosk.
 
+## Current state / next steps (2026-10-02)
+- `modernize` pushed, 97 tests passing. Everything so far runs only against the simulator.
+- Open question for Kevin: fix ingredient names with a lost accent from the old dbs
+  ("Tequila, Jalape�o Infused", "J�germeister", "Strawberry Pur�e") in build/bartendro.db.
+- Next: first real-hardware test (Pi + mini-router + 1-2 pumps, docs/pi-setup.md), then
+  milestone 5 (install script, systemd, hotspot, kiosk for the Waveshare 10.1" screen), then
+  small-pour tuning (ideas in milestone 4 notes) with real pumps and a scale.
+
 ## Layout
 - `src/bartendro/hw/protocol.py` - packet format, CRC16, 7-bit packing (must match
   `firmware/common/packet.h` and `pack7.c`).
@@ -89,6 +106,11 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 - `db/recipes.py` - loads classics.toml (or a file like it): `bartendro-db load-recipes`,
   Admin > Drinks button. `db/menu.py` also has one_bottle_away() and suggest_bottles().
 - `web/theme.py` - party colours -> CSS variable overrides; logos in `<db dir>/uploads`.
+- `showcase.py` - demo setup (bundled drinks, 15 bottles, demo party); `bartendro-web --showcase
+  --banner ... --no-uploads` is what the Dockerfile / `deploy/truenas-demo.yaml` run.
+- `scripts/render_old_ui.py` - renders the original Python 2 templates to build/old-ui.
+- `docs/project-notes.md` - decisions and findings (touchscreen, mini-router firmware, hosting,
+  bot database); `docs/plans/` - approved plans.
 - `config.py` - per-bot TOML (`docs/bartendro.example.toml`): ports, dispensers, db path, screen.
 - Schema change: edit models.py, then `bartendro-db --db scratch.db revision -m "..."`, review
   the generated file (add server_default for new NOT NULL columns); `test_migrations_match_models`
