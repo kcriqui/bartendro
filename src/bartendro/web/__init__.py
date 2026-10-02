@@ -11,11 +11,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import secrets
+import time
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -26,7 +28,7 @@ from starlette.datastructures import UploadFile
 
 from .. import __version__
 from ..bot import Bot, BusyError, CantPourError
-from ..db import options
+from ..db import generation, options
 from ..db import recipes
 from ..db.menu import (PUMP, by_category, can_make, categories_of, category_of, display_name, makeable_drinks,
                        missing_for, one_bottle_away, pumped_and_on_hand, resolve_line, scale_recipe,
@@ -45,6 +47,7 @@ MAX_LOGO_BYTES = 2_000_000
 ESSENTIALS = 4     # drinks in "the essentials": two rows of two
 ROBOTS = {"": "Bartendro party robot", "bar2d2": "Bar2D2 (astromech dome on a Dalek)"}  # Party.robot
 MARQUEE_MAX = 200
+MENU_CACHE_SECONDS = 60  # also catch changes made by another process (bartendro-db)
 
 
 def guest_event(event: dict) -> dict:
@@ -106,10 +109,12 @@ class PreviewRequest(BaseModel):
 
 
 def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = None,
-               banner: str = "", allow_uploads: bool = True) -> FastAPI:
+               banner: str = "", allow_uploads: bool = True, reload_templates: bool = False) -> FastAPI:
     """`uploads`: folder for party logos (default: "uploads" next to the database).
     `banner`: a line shown on every page (the hosted demo bot: "simulated pumps").
-    `allow_uploads=False`: no logo uploads (a copy that's open to the internet)."""
+    `allow_uploads=False`: no logo uploads (a copy that's open to the internet).
+    `reload_templates`: pick up template edits without a restart (development; otherwise every
+    request checks every template file for changes - slow, especially on a network share)."""
     sessions = bot.sessions
     if uploads is None:
         db_file = sessions.kw["bind"].url.database
@@ -134,9 +139,11 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
         bot.unsubscribe(from_bot)
 
     app = FastAPI(title="Bartendro", version=__version__, lifespan=lifespan)
+    app.add_middleware(GZipMiddleware, minimum_size=1000)  # pages to phones over the bot's WiFi
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.mount("/uploads", StaticFiles(directory=uploads), name="uploads")
     templates = Jinja2Templates(directory=HERE / "templates")
+    templates.env.auto_reload = reload_templates
     templates.env.filters["guest"] = display_name  # "Margarita, Pineapple" -> "Pineapple Margarita"
 
     def current_party(request: Request, s) -> Party | None:
@@ -169,10 +176,26 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
                 response.delete_cookie(PREVIEW_COOKIE)
         return response
 
+    menu_cache: dict = {"key": None}
+
+    def makeable_now(s) -> list[Drink]:
+        """makeable_drinks, worked out again only after a database change (db.generation) or
+        MENU_CACHE_SECONDS: it reads every drink and is most of a menu page's time. Everything
+        the guest pages read is loaded here, so the drinks still work once `s` is closed."""
+        key = (generation(), bot.dispenser_count)
+        if menu_cache["key"] != key or time.monotonic() - menu_cache["at"] > MENU_CACHE_SECONDS:
+            drinks = makeable_drinks(s, dispenser_count=bot.dispenser_count)
+            for d in drinks:
+                categories_of(d)
+                for item in d.items:
+                    item.ingredient.name
+            menu_cache.update(key=key, at=time.monotonic(), drinks=drinks)
+        return list(menu_cache["drinks"])
+
     def guest_drinks(s, request: Request) -> tuple[list[Drink], list[Drink]]:
         """(drinks guests can order now, the featured ones for "the essentials"). With a party
         drink list: only those, featured = the party's picks in its order."""
-        drinks = makeable_drinks(s, dispenser_count=bot.dispenser_count)
+        drinks = makeable_now(s)
         party = current_party(request, s)
         if party is not None and party.drinks:
             listed = {pd.drink_id: pd for pd in party.drinks}

@@ -8,6 +8,19 @@ from sqlalchemy import Engine, create_engine, event, inspect
 from sqlalchemy.orm import Session, sessionmaker
 
 MIGRATIONS = Path(__file__).parent / "migrations"
+_generation = 0
+
+
+@event.listens_for(Session, "after_commit")
+def _committed(_session) -> None:
+    global _generation
+    _generation += 1
+
+
+def generation() -> int:
+    """Goes up on every commit in this process, in any session: whatever was worked out from
+    the database (the web app's menu) is stale once it changes."""
+    return _generation
 
 
 def make_engine(path: str | Path) -> Engine:

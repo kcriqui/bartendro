@@ -124,6 +124,9 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 - `bot.py` - port of mixer.py + fsm.py: one action at a time (BusyError), drink -> dispenser
   plan, shots, test dispense, pump runs, clean, levels, CURRENT_SENSE / ERROR states + reset.
   `background=True` runs the pumping in a thread; listeners get status/pour events.
+- Speed (2026-10-02): guest pages ~6 ms on Kevin's Ryzen 9 PC (a Pi 4 is maybe 10x slower). The
+  makeable-drinks list is cached until the next commit (`db.generation()`, after_commit event) or
+  60 s; templates aren't re-checked per request unless `--dev`; responses are gzipped.
 - `web/` - `create_app(bot)` (routes, JSON API under /api, WebSocket /ws), `server.py`
   (`bartendro-web [--sim N]`, port 8080), `templates/`, `static/` (style.css, app.js).
 - `db/recipes.py` - loads classics.toml (or a file like it): `bartendro-db load-recipes`,
@@ -153,8 +156,9 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 - Before committing, run pytest and stop if anything fails (a `| tail` pipe hides the exit code -
   that let a failing commit through once).
 - Local preview like the demo: `bartendro-web --sim 15 --start-from deploy/demo-bot.db --db
-  <scratch>/demo.db --port 8093 --no-uploads` (restart it after Python changes - no auto-reload;
-  templates and static files are live). `?party=<id>` previews a party via a cookie shared by every
+  <scratch>/demo.db --port 8093 --no-uploads --dev` (restart it after Python changes; `--dev` makes
+  template edits live - without it templates are only read once; static files are always live).
+  On Windows time it with `127.0.0.1`, not `localhost` (name lookup adds ~0.3 s). `?party=<id>` previews a party via a cookie shared by every
   localhost port - `?party=0` clears it. The built-in browser pane throttles animations while hidden.
 
 ## Working with Kevin

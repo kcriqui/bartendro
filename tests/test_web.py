@@ -443,3 +443,18 @@ def test_party_robot_and_led_sign(env):
     menu = client.get(f"/?party={pid}").text
     assert 'aria-label="Bartendro robot"' in menu and 'class="led-sign"' not in menu
     client.get("/?party=0")
+
+
+def test_menu_cache_and_compression(env):
+    client, b, _, sessions = env
+    r = client.get("/menu/all", headers={"Accept-Encoding": "gzip"})
+    assert r.headers.get("content-encoding") == "gzip"
+    before = r.text.count('class="drink-item"')
+    assert before > 0
+    client.get("/menu/all")                       # served from the cache
+    # emptying every pump is a database change: the menu is worked out again
+    with sessions() as s:
+        for d in s.scalars(select(Dispenser)):
+            d.ingredient_id = None
+        s.commit()
+    assert client.get("/menu/all").text.count('class="drink-item"') < before
