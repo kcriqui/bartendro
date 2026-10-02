@@ -28,7 +28,7 @@ from .. import __version__
 from ..bot import Bot, BusyError, CantPourError
 from ..db import options
 from ..db import recipes
-from ..db.menu import (PUMP, by_category, can_make, category_of, makeable_drinks, missing_for,
+from ..db.menu import (PUMP, by_category, can_make, categories_of, category_of, makeable_drinks, missing_for,
                        one_bottle_away, pumped_and_on_hand, resolve_line, scale_recipe, sort_key,
                        strength_of, suggest_bottles, uses)
 from ..db.models import (Dispenser, Drink, Ingredient, Kind, Party, PartyDrink, PourLog, RecipeItem,
@@ -177,6 +177,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
         with sessions() as s:
             drinks, essentials = guest_drinks(s, request)
             sections = [(name, slugify(name), len(ds)) for name, ds in by_category(drinks).items()]
+            # "All drinks" counts each drink once even if it's in several sections
             return page(request, "menu.html", essentials=essentials, sections=sections, total=len(drinks))
 
     @app.get("/menu/{slug}")
@@ -285,7 +286,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
                 else:
                     missing = sorted(names[i] for i, _ in missing_for(d, pumped, on_hand))
                     state = "needs " + ", ".join(missing) if missing else "nothing to pump"
-                rows.append((d, category_of(d), state))
+                rows.append((d, ", ".join(categories_of(d)), state))
             n_classics = len(recipes.read().get("drink", []))
             return page(request, "admin/drinks.html", rows=rows, n_classics=n_classics,
                         loaded=request.query_params.get("loaded"))
@@ -507,7 +508,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             can = {d.id for d in makeable_drinks(s, dispenser_count=bot.dispenser_count)}
             colors = {k: getattr(party, f"color_{k}") or v for k, v in THEME_DEFAULTS.items()}
             return page(request, "admin/party.html", p=party, listed=listed, can=can, colors=colors,
-                        sections=by_category(list(all_drinks)), slugify=slugify)
+                        sections=by_category(list(all_drinks), every_section=False), slugify=slugify)
 
     @app.post("/admin/party/{party_id}")
     async def save_party(request: Request, party_id: str):

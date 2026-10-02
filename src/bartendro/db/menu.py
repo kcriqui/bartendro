@@ -9,7 +9,13 @@ from . import options
 from .models import Dispenser, Drink, Ingredient, Kind, Level, RecipeItem
 
 STRENGTH_STEP = 0.25  # each strength/tartness step changes those ingredients by 25% (old drink page)
-SPIRIT_ABV = 35       # a drink's main ingredient at or above this names its menu section
+# Menu sections for spirits, recognised by name (ABVs in old databases are unreliable: tequila
+# and gin at 30%, Cointreau at 40%). Liqueur-style names never count as the spirit.
+SPIRIT_WORDS = {"vodka": "Vodka", "gin": "Gin", "rum": "Rum", "tequila": "Tequila", "mezcal": "Mezcal",
+                "whiskey": "Whiskey", "whisky": "Whiskey", "bourbon": "Whiskey", "scotch": "Whiskey",
+                "rye": "Whiskey", "brandy": "Brandy", "cognac": "Brandy", "armagnac": "Brandy",
+                "cachaca": "Cachaca", "cachaça": "Cachaca", "pisco": "Pisco"}
+NOT_SPIRIT_WORDS = {"liqueur", "cream", "schnapps", "sloe", "creme", "crème"}
 LIQUEURS = "Liqueurs & Wine"
 NON_ALCOHOLIC = "Non-alcoholic"
 
@@ -145,31 +151,57 @@ def root(ing: Ingredient) -> Ingredient:
     return ing
 
 
-def category_of(drink: Drink) -> str:
-    """Menu section: the override, else named after the line with the most alcohol (by its
-    top-level generic: Whiskey, Tequila, Rum, ...) if that's a spirit, "Liqueurs & Wine" if
-    the strongest thing in it is weaker, "Non-alcoholic" without alcohol."""
+def spirit_of(ing: Ingredient) -> str | None:
+    """The spirit section an ingredient belongs to ("Rum" for White Rum, "Rum, Dark" or a brand
+    linked to Rum), or None for liqueurs, wine and mixers."""
+    if not ing.alcoholic:
+        return None
+    for candidate in (root(ing), ing):
+        words = "".join(c if c.isalnum() else " " for c in candidate.name.lower()).split()
+        if NOT_SPIRIT_WORDS & set(words):
+            return None
+        for w in words:
+            if w in SPIRIT_WORDS:
+                return SPIRIT_WORDS[w]
+    return None
+
+
+def categories_of(drink: Drink) -> list[str]:
+    """Menu sections, main one first: the override if set; else one per spirit in the drink
+    (spirit_of: Whiskey, Tequila, Rum, ...) - a Long Island Iced Tea is under Vodka, Tequila,
+    Rum and Gin - ordered by how much alcohol it brings; "Liqueurs & Wine" when its alcohol is
+    all liqueur / wine; "Non-alcoholic" without alcohol. Dashes (bitters) don't count."""
     if drink.category:
-        return drink.category
-    best, best_ethanol = None, 0.0
+        return [drink.category]
+    ethanol: dict[str, float] = {}
+    weaker = False
     for item in drink.items:
         ing = item.ingredient
-        if not ing.alcoholic or item.parts is None:  # a dash of bitters doesn't make it a drink
+        if not ing.alcoholic or item.parts is None:
             continue
-        ethanol = item.parts * max(ing.abv, 1.0)
-        if best is None or ethanol > best_ethanol:
-            best, best_ethanol = ing, ethanol
-    if best is None:
-        return NON_ALCOHOLIC
-    top = root(best)
-    return top.name if max(top.abv, best.abv) >= SPIRIT_ABV else LIQUEURS
+        spirit = spirit_of(ing)
+        if spirit:
+            ethanol[spirit] = ethanol.get(spirit, 0.0) + item.parts * max(ing.abv, 1.0)
+        else:
+            weaker = True
+    if ethanol:
+        return sorted(ethanol, key=lambda name: (-ethanol[name], name))
+    return [LIQUEURS] if weaker else [NON_ALCOHOLIC]
 
 
-def by_category(drinks: list[Drink]) -> dict[str, list[Drink]]:
-    """{section: drinks}, sections alphabetical with Liqueurs & Wine and Non-alcoholic last."""
+def category_of(drink: Drink) -> str:
+    """The drink's main menu section (see categories_of)."""
+    return categories_of(drink)[0]
+
+
+def by_category(drinks: list[Drink], every_section: bool = True) -> dict[str, list[Drink]]:
+    """{section: drinks}, sections alphabetical with Liqueurs & Wine and Non-alcoholic last. A
+    drink with several spirits is in each of their sections (`every_section=False`: only its
+    main one, e.g. for pickers that must list each drink once)."""
     out: dict[str, list[Drink]] = {}
     for d in drinks:
-        out.setdefault(category_of(d), []).append(d)
+        for section in categories_of(d) if every_section else [category_of(d)]:
+            out.setdefault(section, []).append(d)
     order = sorted(out, key=lambda c: (c in (LIQUEURS, NON_ALCOHOLIC), c == NON_ALCOHOLIC, c.lower()))
     return {c: sorted(out[c], key=sort_key) for c in order}
 

@@ -386,3 +386,20 @@ def test_theme_css():
                           color_button="#336699", color_go=""))
     assert "--page: #000000;" in css and "--frame-inner: " + darker("#ff0000") in css
     assert "--heading" not in css and "--btn-1: " + lighter("#336699") in css and "--go" not in css
+
+
+def test_multi_spirit_drink_in_each_section_menu(env):
+    client, b, _, sessions = env
+    client.post("/admin/recipes/load")
+    # (the old db's name for white rum is "Rum, Light"; loading the classics matched it)
+    for n, name in [(2, "Tequila"), (3, "Rum, Light"), (4, "Gin"), (5, "Triple Sec"), (6, "Lemon Juice"),
+                    (7, "Simple Syrup"), (8, "Cola")]:
+        assert client.post(f"/api/dispenser/{n}", json={"ingredient": name}).status_code == 200
+    menu = client.get("/").text
+    for slug in ("vodka", "tequila", "rum", "gin"):
+        assert f"/menu/{slug}" in menu
+        assert "Long Island Iced Tea" in client.get(f"/menu/{slug}").text, slug
+    assert client.get("/menu/all").text.count(">Long Island Iced Tea<") == 1
+    admin = client.get("/admin/drinks").text
+    row = admin[admin.index(">Long Island Iced Tea<"):].split("</tr>")[0]
+    assert all(name in row for name in ("Vodka", "Tequila", "Rum", "Gin"))

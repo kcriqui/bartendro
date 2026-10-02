@@ -7,7 +7,8 @@ from bartendro.db import open_db
 from bartendro.db import recipes
 from bartendro.db.models import PUMP_ML
 from bartendro.db.importer import import_legacy
-from bartendro.db.menu import (LIQUEURS, NON_ALCOHOLIC, by_category, category_of, makeable_drinks,
+from bartendro.db.menu import (LIQUEURS, NON_ALCOHOLIC, by_category, categories_of, category_of, makeable_drinks,
+                               spirit_of,
                                one_bottle_away, suggest_bottles)
 from bartendro.db.models import Dispenser, Drink, Ingredient
 
@@ -242,6 +243,34 @@ def test_categories(session):
     assert category_of(d) == "Party specials"
     sections = list(by_category(list(session.scalars(select(Drink)))))
     assert sections[-2:] == [LIQUEURS, NON_ALCOHOLIC] and sections[0] < sections[1]
+
+
+def test_drinks_with_several_spirits_are_in_each_section(session):
+    recipes.load(session)
+    lit = drink(session, "Long Island Iced Tea")
+    assert sorted(categories_of(lit)) == ["Gin", "Rum", "Tequila", "Vodka"]
+    assert categories_of(drink(session, "Godfather")) == ["Whiskey"]  # amaretto is a liqueur
+    assert categories_of(drink(session, "Black Russian")) == ["Vodka"]
+    assert categories_of(drink(session, "Caipirinha")) == ["Cachaca"]
+    sections = by_category(list(session.scalars(select(Drink))))
+    for name in ("Vodka", "Tequila", "Rum", "Gin"):
+        assert lit in sections[name]
+    assert lit not in sections[LIQUEURS]
+    once = by_category(list(session.scalars(select(Drink))), every_section=False)
+    assert sum(len(ds) for ds in once.values()) == len(session.scalars(select(Drink)).all())
+    lit.category = "Party specials"  # an override puts it in just that section
+    assert categories_of(lit) == ["Party specials"]
+
+
+def test_spirits_recognised_by_name_not_abv(session):
+    # old databases: tequila and gin at 30%, Cointreau at 40%, names like "Rum, Dark"
+    import_legacy(DEFAULT_DB, session)
+    names = {i.name: i for i in session.scalars(select(Ingredient))}
+    assert spirit_of(names["Tequila"]) == "Tequila" and names["Tequila"].abv == 30
+    assert spirit_of(names["Gin"]) == "Gin"
+    assert spirit_of(names["Rum, Dark"]) == "Rum" and spirit_of(names["Vodka, Bacon Infused"]) == "Vodka"
+    assert spirit_of(names["Cointreau"]) is None and spirit_of(names["Baileys"]) is None
+    assert spirit_of(names["Butterscotch Schnapps"]) is None and spirit_of(names["Orange Juice"]) is None
 
 
 def test_non_alcoholic_drinks_have_no_alcohol():
