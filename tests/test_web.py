@@ -341,11 +341,11 @@ def test_parties(env, tmp_path):
     title = str(escape("Kevin's 40th"))  # as the page escapes it
     menu = client.get("/").text
     assert title not in menu and "--page: #102030" not in menu
-    assert 'class="robot-bg"' in menu  # no party logo: the robot backdrop
+    assert 'class="robot-bg' in menu  # no party logo: the robot backdrop
     # preview: the party's look and menu, remembered by a cookie
     menu = client.get(f"/?party={pid}").text
     assert title in menu and "Tip your robot!" in menu and "--page: #102030" in menu
-    assert f"/uploads/{logo}" in menu and 'class="robot-bg"' in menu  # banner on top, robot behind
+    assert f"/uploads/{logo}" in menu and 'class="robot-bg' in menu  # banner on top, robot behind
     essentials = menu.split("the essentials")[1].split("the menu")[0]
     assert essentials.index("Cape Cod") < essentials.index("Black Russian")  # party order
     assert "Screwdriver" not in essentials  # on the list but not featured
