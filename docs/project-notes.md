@@ -120,7 +120,9 @@ Party settings: robot = bar2d2, R2 colours (frame/buttons #2a5db0, headings #1f3
 instead of a banner image an **LED sign** - a scrolling rainbow dot-matrix with settable text, default
 "My Name is Bar2D2, I think I love you ;)". Both are per-party settings any party can use (Admin >
 Parties: "Robot behind the menus", "LED sign text"; migration 0007).
-LED sign font (2026-10-02): the classic 5x7 Adafruit GFX font (`static/led-font.js`, BSD - keep the
-notice), doubled with Scale2x to 2x2 LEDs per font dot (16 LED rows). Kevin: "a little too much
-smoothing but OK for now" - he'll look for reference fonts later; a bitmap font drawn for 16 rows
-would replace the font + scale2x step in app.js `ledSign`.
+LED sign font (2026-10-02): **9x15 bold**, one of the public-domain X11 misc-fixed bitmap fonts as
+shipped for LED panels by https://github.com/hzeller/rpi-rgb-led-matrix (fonts/9x15B.bdf), one LED per
+font pixel on the 16-row board (`static/led-font.js`). Kevin picked it from a side-by-side of 7x14,
+8x13, 9x15 (regular + bold) and Helvetica 12 (scratch: build/fonts/compare.html, bdf2json.py). Tried
+before and rejected: canvas text (strokes too thick), the Adafruit GFX 5x7 (boring), 5x7 doubled with
+Scale2x (too smoothed). Pixel Operator (CC0, 16 px) wasn't reachable to try.

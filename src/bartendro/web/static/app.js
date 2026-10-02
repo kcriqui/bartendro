@@ -296,39 +296,22 @@ const Bartendro = (() => {
   }
 
   // ---------------------------------------------------------------- LED sign (party marquee)
-  // A scrolling RGB dot-matrix sign in the classic 5x7 LED font (static/led-font.js, from the
-  // Adafruit GFX Library), doubled with Scale2x: every font pixel becomes 2x2 LEDs and the steps
-  // on diagonals and curves are filled in, so letters come out rounder. Every lit LED is coloured
+  // A scrolling RGB dot-matrix sign: 16 LED rows plus a dark row above and below, the text in the
+  // 9x15 bold bitmap font (static/led-font.js) - one LED per font pixel. Every lit LED is coloured
   // from a rainbow that drifts along as the text moves.
-  function scale2x(src, h) {                  // src: one bit-column per x (bit y); h rows -> 2h rows
-    const at = (x, y) => (x >= 0 && x < src.length && y >= 0 && y < h ? (src[x] >> y) & 1 : 0);
-    const out = new Array(src.length * 2).fill(0);
-    for (let x = 0; x < src.length; x++) {
-      for (let y = 0; y < h; y++) {
-        const p = at(x, y), a = at(x, y - 1), b = at(x + 1, y), c = at(x - 1, y), d = at(x, y + 1);
-        const e = [p, p, p, p];               // top-left, top-right, bottom-left, bottom-right
-        if (c === a && c !== d && a !== b) e[0] = a;
-        if (a === b && a !== c && b !== d) e[1] = b;
-        if (d === c && d !== b && c !== a) e[2] = c;
-        if (b === d && b !== a && d !== c) e[3] = d;
-        out[2 * x] |= (e[0] << (2 * y)) | (e[2] << (2 * y + 1));
-        out[2 * x + 1] |= (e[1] << (2 * y)) | (e[3] << (2 * y + 1));
-      }
-    }
-    return out;
-  }
   function ledSign(canvas) {
-    const ROWS = 16, PAD = 1;                  // the font's 8 rows (7 + descenders) doubled, a dark row above/below
-    const font = window.LED_FONT_5X7 || "";
+    const ROWS = 16, PAD = 1;
+    const font = window.LED_FONT || { width: 0, height: 0, first: 32, data: "" };
+    const top = Math.floor((ROWS - font.height) / 2);   // font rows centred in the 16
     const glyph = (ch) => {
       let code = ch.charCodeAt(0);
       if (code < 32 || code > 126) code = 63;  // "?" for anything the font doesn't have
-      const at = (code - 32) * 10;
-      return [0, 1, 2, 3, 4].map((i) => parseInt(font.substr(at + i * 2, 2), 16) || 0);
+      const at = (code - font.first) * font.width * 4;
+      return Array.from({ length: font.width },
+        (_, i) => (parseInt(font.data.substr(at + i * 4, 4), 16) || 0) << top);
     };
-    const small = [];                           // one byte per column of the whole message
-    for (const ch of canvas.dataset.text || "") small.push(...glyph(ch), 0);
-    const columns = scale2x(small, 8);          // ...and at double resolution
+    const columns = [];                         // one bitmask (bit 0 = top LED row) per column
+    for (const ch of canvas.dataset.text || "") columns.push(...glyph(ch));
     const ctx = canvas.getContext("2d");
     const slow = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let cols = 0, pitch = 0, step = 0, last = 0;
