@@ -3,47 +3,55 @@
 {% block content %}
 <section class="drink" data-drink="{{ drink.id }}" data-size="{{ size }}" data-step="{{ size_step }}"
          data-max="{{ max_size }}" data-steps="{{ opts.strength_steps }}">
-  <h1>{{ drink.name }}</h1>
-  {% if drink.description %}<p class="desc">{{ drink.description }}</p>{% endif %}
-  {% if drink.glass or drink.instructions %}
-  <p class="serve">{% if drink.glass %}<span class="glass">{{ drink.glass }} glass</span>{% endif %}
-    {{ drink.instructions }}</p>
-  {% endif %}
-  {% if drink.finish %}<p class="serve"><b>Then:</b> {{ drink.finish }}</p>{% endif %}
-
-  <table class="recipe" id="recipe">
-    {% for item in drink.items %}
-    <tr><td>{{ item.ingredient.name }}{% if item.ingredient.manual %} <em>(add by hand)</em>{% endif %}</td>
-        <td class="num"></td></tr>
-    {% endfor %}
-  </table>
-
-  <div class="adjust">
-    {% if opts.show_size %}
-    <div class="adjust-row">
-      <span class="adjust-label">Size</span>
-      <button class="btn round" data-adjust="size" data-dir="-1">&minus;</button>
-      <span class="adjust-value" id="size-text"></span>
-      <button class="btn round" data-adjust="size" data-dir="1">+</button>
+  <h1 class="drink-heading">Make: {{ drink.name }}</h1>
+  <div class="drink-body">
+    <div>
+      {% if drink.description %}<p>{{ drink.description }}</p>{% endif %}
+      {% if drink.glass or drink.instructions %}
+      <p class="serve">{% if drink.glass %}<span class="glass">{{ drink.glass }} glass</span>{% endif %}
+        {{ drink.instructions }}</p>
+      {% endif %}
+      <div class="subhead">ingredients:</div>
+      <table class="recipe" id="recipe">
+        {% for item in drink.items %}
+        <tr><td>{{ item.ingredient.name }}</td><td class="num"></td></tr>
+        {% endfor %}
+      </table>
+      {% if drink.finish %}<p class="serve"><b>Then:</b> {{ drink.finish }}</p>{% endif %}
+      <p class="error" id="plan-error" hidden></p>
     </div>
-    {% endif %}
-    {% if opts.show_strength and opts.strength_steps > 0 %}
-    <div class="adjust-row">
-      <span class="adjust-label">Strength</span>
-      <button class="btn round" data-adjust="strength" data-dir="-1">&minus;</button>
-      <span class="adjust-value" id="strength-text">normal</span>
-      <button class="btn round" data-adjust="strength" data-dir="1">+</button>
+    <div class="stack">
+      {% if opts.show_size %}
+      <div class="adjust">
+        <div class="adjust-title">size</div>
+        <div class="adjust-row">
+          <button class="btn" data-adjust="size" data-dir="-1">&minus;</button>
+          <span class="adjust-value" id="size-text"></span>
+          <button class="btn" data-adjust="size" data-dir="1">+</button>
+        </div>
+        <div class="adjust-hints"><span>smaller</span><span></span><span>bigger</span></div>
+      </div>
+      {% endif %}
+      {% if opts.show_strength and opts.strength_steps > 0 %}
+      <div class="adjust">
+        <div class="adjust-title">strength</div>
+        <div class="adjust-row">
+          <button class="btn" data-adjust="strength" data-dir="-1">&minus;</button>
+          <span class="adjust-value" id="strength-text">normal</span>
+          <button class="btn" data-adjust="strength" data-dir="1">+</button>
+        </div>
+        <div class="adjust-hints"><span>weaker</span><span></span><span>stronger</span></div>
+      </div>
+      {% endif %}
+      <div class="make-buttons">
+        <a class="btn" href="javascript:history.back()">Back</a>
+        {% if opts.show_taster %}
+        <button class="btn go" id="taster" data-taster="{{ taster }}">Taster</button>
+        {% endif %}
+        <button class="btn go big" id="make">Pour Drink!</button>
+      </div>
     </div>
-    {% endif %}
   </div>
-
-  <div class="make-buttons">
-    <button class="btn primary big" id="make">Make it!</button>
-    {% if opts.show_taster %}
-    <button class="btn big" id="taster" data-taster="{{ taster }}">Taster ({{ amount(taster) }})</button>
-    {% endif %}
-  </div>
-  <p class="error" id="plan-error" hidden></p>
 </section>
 {% endblock %}
 {% block scripts %}<script>Bartendro.drinkPage();</script>{% endblock %}

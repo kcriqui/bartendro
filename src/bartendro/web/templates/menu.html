@@ -1,25 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
-{% macro cards(drinks) %}
-<div class="cards">
+{% macro drink_list(drinks, cls="") %}
+<div class="drinks {{ cls }}">
   {% for d in drinks %}
-  <a class="card" href="/drink/{{ d.id }}">
-    <span class="card-name">{{ d.name }}</span>
-    {% if d.description %}<span class="card-desc">{{ d.description }}</span>{% endif %}
-  </a>
+  <div class="drink-item">
+    <a class="btn" href="/drink/{{ d.id }}">{{ d.name }}</a>
+    <div class="ingredients">{{ d.items | rejectattr("parts", "none") | map(attribute="ingredient.name") | join(", ") }}</div>
+    {% if d.description %}<div class="desc">{{ d.description }}</div>{% endif %}
+  </div>
   {% endfor %}
 </div>
 {% endmacro %}
-{% if not essentials and not others %}
-  <p class="empty">No drinks can be made right now. Check the bottles on the
-    <a href="/admin">dispenser page</a>.</p>
-{% endif %}
-{% if essentials %}
-  <h2 class="section">The essentials</h2>
-  {{ cards(essentials) }}
-{% endif %}
-{% if others %}
-  <h2 class="section">{% if essentials %}More drinks{% else %}Drinks{% endif %}</h2>
-  {{ cards(others) }}
+
+{% if not sections %}
+  <div class="sick">
+    <img src="/static/img/sick_party_robot.png" alt="">
+    <p>{% if status.state in ("error", "current_sense") %}Bartendro needs help: {{ status.message }}
+       {% else %}No drinks can be made right now.{% endif %}
+       <br><a href="/admin">Check the bottles</a></p>
+  </div>
+{% else %}
+  {% if essentials %}
+    <h1>the essentials</h1>
+    {{ drink_list(essentials, "essentials") }}
+  {% endif %}
+  <h1>the menu</h1>
+  <div class="sections">
+    {% for name, slug, count in sections %}
+    <a class="btn" href="/menu/{{ slug }}">{{ name }} <span class="count">{{ count }}</span></a>
+    {% endfor %}
+    {% if sections | length > 1 %}
+    <a class="btn plain" href="/menu/all">All drinks <span class="count">{{ total }}</span></a>
+    {% endif %}
+  </div>
 {% endif %}
 {% endblock %}

@@ -54,14 +54,21 @@ def black_russian(sessions):
 def test_pages_render(env):
     client, b, _, sessions = env
     d = black_russian(sessions)
-    for url in ["/", f"/drink/{d}", "/shots", "/admin", "/admin/drinks", f"/admin/drink/{d}",
+    for url in ["/", "/menu/all", "/menu/vodka", f"/drink/{d}", "/shots", "/admin", "/admin/drinks",
+                f"/admin/drink/{d}",
                 "/admin/drink/new", "/admin/ingredients", "/admin/ingredient/1", "/admin/ingredient/new",
                 "/admin/options", "/admin/log", "/static/app.js", "/static/style.css"]:
         r = client.get(url)
         assert r.status_code == 200, url
     menu = client.get("/").text
-    assert "Testbot" in menu and "Black Russian" in menu and "The essentials" in menu
-    assert "Tequila Sunrise" not in menu  # no tequila on the dispensers
+    assert "Testbot" in menu and "the essentials" in menu and "the menu" in menu
+    assert '/menu/vodka' in menu and '/menu/all' in menu
+    everything = client.get("/menu/all").text
+    assert "Black Russian" in everything
+    assert "Tequila Sunrise" not in everything  # no tequila on the dispensers
+    vodka = client.get("/menu/vodka").text
+    assert "Black Russian" in vodka and "Amaretto Sour" not in vodka
+    assert client.get("/menu/no-such-section", follow_redirects=False).status_code == 303
     assert 'class="on"' in client.get("/admin/drinks").text  # tab highlighted
 
 
@@ -158,7 +165,7 @@ def test_admin_drink_edit(env):
         assert {(i.ingredient_id, i.parts) for i in d.items} == {(1, 2), (4, 2)}  # vodka rows added
         assert d.enabled and not d.popular
         drink_id = d.id
-    assert "Screwdriver Deluxe" in client.get("/").text
+    assert "Screwdriver Deluxe" in client.get("/menu/all").text
     assert client.post(f"/admin/drink/{drink_id}/toggle/popular").json() == {"popular": True}
     # edit it, keeping vodka (the old rows must go before the new ones are added)
     r = client.post(f"/admin/drink/{drink_id}", data={"name": "Screwdriver Deluxe", "enabled": "on",
@@ -195,7 +202,7 @@ def test_admin_options(env):
         assert options.get(s, "drink_size") == 180
         assert options.get(s, "shot_size") == 30       # bad value ignored
         assert options.get(s, "show_size") is False    # unticked box
-    assert "Taster (30 ml)" in client.get(f"/drink/{black_russian(sessions)}").text  # metric now
+    assert "Each shot is 30 ml" in client.get("/shots").text  # metric now
 
 
 def test_hand_added_amounts_in_admin_and_plan(env):

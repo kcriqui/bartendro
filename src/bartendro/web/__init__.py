@@ -26,13 +26,18 @@ from .. import __version__
 from ..bot import Bot, BusyError, CantPourError
 from ..db import options
 from ..db import recipes
-from ..db.menu import makeable_drinks, one_bottle_away, suggest_bottles
+from ..db.menu import by_category, makeable_drinks, one_bottle_away, sort_key, suggest_bottles
 from ..db.models import Dispenser, Drink, Ingredient, Kind, PourLog, RecipeItem, utcnow
 
 log = logging.getLogger(__name__)
 HERE = Path(__file__).parent
 ML_PER_OZ = 29.57  # the old UI used 30
 SIZE_STEP_ML = 30  # drink size +/- buttons (old size_increment)
+ESSENTIALS = 4     # drinks in "the essentials": two rows of two
+
+
+def slugify(name: str) -> str:
+    return "-".join("".join(c if c.isalnum() else " " for c in name.lower()).split())
 
 
 class MakeRequest(BaseModel):
@@ -84,9 +89,16 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
 
         def amount(ml: float) -> str:
             return f"{ml:.0f} ml" if metric else f"{ml / ML_PER_OZ:.1f} oz"
+        path = request.url.path
+        nav = "admin" if path.startswith("/admin") else "shots" if path.startswith("/shots") else "drinks"
         return templates.TemplateResponse(request, name, {
             "bot_name": bot_name, "status": bot.status(), "opts": opts, "amount": amount,
-            "version": __version__, **ctx})
+            "version": __version__, "nav": nav, "party": None, "theme_css": "", **ctx})
+
+    def guest_drinks(s) -> tuple[list[Drink], list[Drink]]:
+        """(drinks guests can order now, the featured ones for "the essentials")."""
+        drinks = makeable_drinks(s, dispenser_count=bot.dispenser_count)
+        return drinks, [d for d in drinks if d.popular][:ESSENTIALS]
 
     # ------------------------------------------------------------------ errors
 
@@ -103,10 +115,23 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
     @app.get("/")
     def menu(request: Request):
         with sessions() as s:
-            drinks = makeable_drinks(s, dispenser_count=bot.dispenser_count)
-            essentials = [d for d in drinks if d.popular]
-            others = [d for d in drinks if not d.popular]
-            return page(request, "menu.html", essentials=essentials, others=others)
+            drinks, essentials = guest_drinks(s)
+            sections = [(name, slugify(name), len(ds)) for name, ds in by_category(drinks).items()]
+            return page(request, "menu.html", essentials=essentials, sections=sections, total=len(drinks))
+
+    @app.get("/menu/{slug}")
+    def menu_section(request: Request, slug: str):
+        with sessions() as s:
+            drinks, _ = guest_drinks(s)
+            if slug == "all":
+                title, chosen = "All drinks", sorted(drinks, key=sort_key)
+            else:
+                sections = by_category(drinks)
+                title = next((n for n in sections if slugify(n) == slug), None)
+                if title is None:
+                    return RedirectResponse("/", status_code=303)
+                chosen = sections[title]
+            return page(request, "category.html", title=title, drinks=chosen)
 
     @app.get("/drink/{drink_id}")
     def drink_page(request: Request, drink_id: int):

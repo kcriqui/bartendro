@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Shots - {{ bot_name }}{% endblock %}
 {% block content %}
-<h2 class="section">Shots ({{ amount(shot_size) }})</h2>
+<h1>Shots</h1>
+<p>Each shot is {{ amount(shot_size) }}. <b>Put a glass under the spout first!</b></p>
 {% if not dispensers %}<p class="empty">No bottles are loaded.</p>{% endif %}
-<div class="cards">
-  {% for d in dispensers %}
-  <button class="card" data-post="/api/shot/{{ d.number }}"
-          {% if opts.use_liquid_level_sensors and d.level.value == "out" %}disabled{% endif %}>
-    <span class="card-name">{{ d.ingredient.name }}</span>
-    <span class="card-desc">dispenser #{{ d.number }}{% if opts.use_liquid_level_sensors and d.level.value != "unknown" %} &middot; {{ d.level.value }}{% endif %}</span>
-  </button>
-  {% endfor %}
+{% for d in dispensers %}
+<div class="shot-row">
+  <button class="btn go" data-post="/api/shot/{{ d.number }}"
+          {% if opts.use_liquid_level_sensors and d.level.value == "out" %}disabled{% endif %}>{{ d.ingredient.name }}</button>
+  <div>{{ d.ingredient.description }}{% if opts.use_liquid_level_sensors and d.level.value != "unknown" %}
+    <span class="muted">{{ d.level.value }}</span>{% endif %}</div>
 </div>
+{% endfor %}
 {% endblock %}
