@@ -5,9 +5,6 @@ Tailscale Funnel. Visitors only need a browser; Tailscale runs on the NAS. The d
 the showcase setup (bundled drinks, 15 bottles, a demo party) and resets on every restart.
 There's no login: anyone with the link can use everything, admin included; logo uploads are off.
 
-(For a look-only copy without a server there's the static site: `scripts/export_site.py`,
-https://kcriqui.github.io/bartendro/.)
-
 ## 1. Run the container on TrueNAS
 
 Apps > Discover Apps > three-dots menu > **Install via YAML**, name `bartendro-demo`, paste

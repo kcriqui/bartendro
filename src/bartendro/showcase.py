@@ -1,4 +1,4 @@
-"""The showcase setup used by the demo copies (static site, hosted demo bot): the bundled
+"""The showcase setup used by the hosted demo bot (bartendro-web --showcase): the bundled
 recipes, 15 bottles on the pumps, the usual by-hand items on hand and an inactive demo party."""
 
 from __future__ import annotations

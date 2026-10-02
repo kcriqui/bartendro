@@ -91,10 +91,8 @@ class PreviewRequest(BaseModel):
 
 
 def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = None,
-               demo: bool = False, banner: str = "", allow_uploads: bool = True) -> FastAPI:
+               banner: str = "", allow_uploads: bool = True) -> FastAPI:
     """`uploads`: folder for party logos (default: "uploads" next to the database).
-    `demo`: pages for the static demo site (scripts/export_site.py): a banner, no live
-    connection, and static/demo.js standing in for the bot.
     `banner`: a line shown on every page (the hosted demo bot: "simulated pumps").
     `allow_uploads=False`: no logo uploads (a copy that's open to the internet)."""
     sessions = bot.sessions
@@ -145,7 +143,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             response = templates.TemplateResponse(request, name, {
                 "bot_name": bot_name, "status": bot.status(), "opts": opts, "amount": amount,
                 "version": __version__, "nav": nav, "party": party, "theme_css": theme_css(party),
-                "demo": demo, "banner": banner, "allow_uploads": allow_uploads, **ctx})
+                "banner": banner, "allow_uploads": allow_uploads, **ctx})
         preview = request.query_params.get("party")
         if preview is not None and preview.isdigit():
             if int(preview):

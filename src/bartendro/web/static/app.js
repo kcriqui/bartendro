@@ -248,7 +248,6 @@ const Bartendro = (() => {
       const size = form.querySelector("[name=size_ml]").value;
       try {
         const data = await post("/api/drink-preview", { rows, size_ml: size ? +size : null });
-        if (data.demo) { preview.textContent = "The live preview runs on the bot itself, not in this static demo."; return; }
         preview.innerHTML = "";
         const head = document.createElement("div");
         head.textContent = `Pours ${amount(data.size_ml)}: ${data.abv}% ABV, ` +
@@ -297,6 +296,6 @@ const Bartendro = (() => {
   }
 
   showStatus(window.BARTENDRO.status);
-  if (!window.BARTENDRO.demo) connect();  // the static demo (demo.js) feeds onEvent itself
-  return { drinkPage, drinkEditor, filterTable, pumpCards, toast, post, onEvent };
+  connect();
+  return { drinkPage, drinkEditor, filterTable, pumpCards, toast, post };
 })();

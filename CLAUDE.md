@@ -5,6 +5,18 @@ Work happens on branch `modernize`. Lives on the NAS (`P:\Claude\bartendro` =
 `\\TRUENAS\Projects\Claude\bartendro`). This project is separate from Kevin's eBay tools
 (`P:\Claude\starlight-ebay-template`) - never touch that from here.
 
+## Working from two PCs (home and office)
+Kevin works on this from his home PC and his office PC, so **everything this project creates
+lives here on the NAS**, not in a PC's local folders:
+- Plans: `docs/plans/<date>-<topic>.md`. Plan mode writes to `~/.claude/plans/` on the local PC -
+  copy the approved plan into `docs/plans/` and delete the local copy.
+- Notes, decisions, findings: `docs/project-notes.md` (and this file), not Claude's local memory.
+- Scratch / demo databases, renders, logs: `build/` (git-ignored, but on the NAS). Preview servers
+  in `.claude/launch.json` use relative paths into `build/`.
+- Per-PC setup (once on each PC): Python 3.11+, `pip install -e ".[dev]"` in the repo (puts
+  `bartendro-hw` / `-db` / `-web` on PATH), `gh auth login`. If git complains about "dubious
+  ownership" on the share: `git config --global --add safe.directory '%(prefix)///TRUENAS/Projects/Claude/bartendro'`.
+
 ## Goal
 Replace the Python 2 Pi software (`ui/`) with a maintainable Python 3 app, keeping the
 original router board, peristaltic dispensers and AVR firmware (`firmware/`, unchanged).

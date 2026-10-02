@@ -24,8 +24,6 @@
   </a>
 </header>
 {% if banner %}<div class="demo-banner">{{ banner }}</div>{% endif %}
-{% if demo %}<div class="demo-banner">Static demo of the new Bartendro software: nothing pours and nothing is
-  saved. <a href="https://github.com/kcriqui/bartendro/tree/modernize">Source</a></div>{% endif %}
 <div id="statusbar" class="statusbar state-{{ status.state }}" data-state="{{ status.state }}">
   <span id="status-text"></span>
 </div>
@@ -51,8 +49,7 @@
   </div>
 </div>
 <div id="toast" class="toast" hidden></div>
-<script>window.BARTENDRO = {{ {"status": status, "metric": opts.metric, "demo": demo} | tojson }};</script>
-{% if demo %}<script src="/static/demo.js"></script>{% endif %}
+<script>window.BARTENDRO = {{ {"status": status, "metric": opts.metric} | tojson }};</script>
 <script src="/static/app.js"></script>
 {% block scripts %}{% endblock %}
 </body>

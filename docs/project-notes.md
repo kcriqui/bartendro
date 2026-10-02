@@ -1,0 +1,63 @@
+# Project notes
+
+Decisions and findings that aren't obvious from the code. Kept here (on the NAS, in the repo)
+so they're the same from every PC. Plans live in [plans/](plans/).
+
+## Touchscreen for the 15-pump bots (2026-10-01)
+
+Kevin plans to buy the **Waveshare 10.1" capacitive touch display with aluminium case** (1280x800,
+bonded glass, HDMI + USB-C; Amazon ASIN B0C2V6J4F9, $115.99). He prefers HDMI + USB touch over
+DSI/GPIO displays. On a Pi 3B+/4: HDMI for video, the display's USB-C port to a Pi USB-A port for
+touch (the Pi can't send video over USB-C); power the display separately.
+
+Architecture: one web app; a Chromium kiosk on localhost AND phones over WiFi at the same time.
+The server owns the state machine / pour lock (one drink at a time); the WebSocket pushes pour
+status to every screen. Why: the WiFi web UI was always unreliable on the old bots, so the local
+screen must not depend on WiFi. Kiosk setup belongs to milestone 5. No login for anyone (Kevin's
+call); the hosted demo is open too.
+
+## Mini-router (3-port) vs 15-port router firmware (2026-10-01)
+
+Firmware unchanged since 2013. The first hardware test is planned on a Pi + mini-router + 1-2
+dispensers, and the small bots (margaritabot, ...) use the mini-router. Short version is also in
+[pi-setup.md](pi-setup.md#mini-router-3-port-board).
+
+**Same on both:** I2C address 4; commands select (<15), RESET 255, SYNC_ON 251 / SYNC_OFF 252
+(neither implements PING 253 / COUNT 254); reset = 5 sync pulses, 10 ms reset pulse, 2 s wait; the
+Pi's TX goes to all dispensers, only dispenser->Pi RX is switched. The Python code needs no changes
+(`--ports 3`).
+
+**Differences** (the mini-router never got the Aug 2013 router rewrite, Ray Lee's
+partyrobotics/bartendro#77, commits e9ef45f/d7578c6):
+- Ports 0-2 only (0=PD4, 1=PD3, 2=PD0). Selecting 3-14 is accepted but relays nothing.
+- Echo: the router copies current pin levels on any pin change ("always echo"). The mini-router
+  compares against a cached level per pin (pcint16/19/20) that only updates while that port is
+  selected, so it can go stale -> missed edge -> inverted/garbled bytes.
+- Startup: the router's setup() initialises the output lines from the inputs (dabf672). The
+  mini-router never sets PB0 (TX to Pi): it starts LOW (a break) with cache 0 while idle is high,
+  so the first reply after a reset can be garbled. discover()'s 3-identical-bytes check and 5
+  retries should absorb it.
+- The mini-router enables the pull-up on PB1 (Pi RX input; its comment wrongly says "B1 high").
+- The pre-2013 ui driver had a "mini-router mapping hack" rotating ids for 3 dispensers, removed
+  in b6773ea when the mini-router firmware was added. Confirm physical port 0 with `discover`.
+
+If a mini-router bot shows "inconsistent, retrying", short replies, lost ACKs or is_dispensing
+noise that the 15-port router doesn't, suspect the echo scheme first. Fix: port router.c's
+echo_dispenser()/echo_rpi() and the startup line init (~20 lines, 3-entry pin table); needs
+avr-gcc + an AVR ISP programmer, so only if testing shows problems. Kevin's board may not even run
+the repo's version of the firmware.
+
+## Hosted demo bot (2026-10-02)
+
+Fully working copy with simulated pumps for colleagues outside the LAN ([hosting.md](hosting.md)):
+TrueNAS custom app **`bartendro-demo`** (Install via YAML with `deploy/truenas-demo.yaml`, entered
+as one-line JSON because the TrueNAS editor auto-indents), NAS port **8077**, made public by Kevin
+with `tailscale funnel --bg 8077` in the TrueNAS tailscale app's shell. One shared bot, no
+password (Kevin's choice). Restart the app to reset it to the showcase.
+- New code reaches it only when the app is edited/redeployed in TrueNAS (`pull_policy: build`).
+- The first build failed with a transient "SSL connection timeout" fetching from GitHub; a retry
+  worked. If it recurs, publish a prebuilt image (GHCR) instead of building on the NAS.
+- NAS access from the PC is the TrueNAS web UI (Kevin's Chrome); no SSH. App logs need root:
+  Kevin runs `sudo tail -n 40 /var/log/app_lifecycle.log`. Funnel / ACL changes are Kevin's to make.
+- The static GitHub Pages demo was removed on 2026-10-02 (gh-pages deleted). GitHub's API refused
+  to switch Pages off for this fork; with no branch it serves nothing.
