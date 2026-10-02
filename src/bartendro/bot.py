@@ -268,7 +268,19 @@ class Bot:
         left and right only mean something on a 15-pump bot."""
         if which not in ("all", "left", "right"):
             raise CantPourError("clean: all, left or right")
-        self._run(self._clean, which, background=background, allow_broken=True)
+        n = self.dispenser_count
+        if n == 15 and which != "all":
+            pumps = CLEAN_LEFT if which == "left" else CLEAN_RIGHT
+        else:
+            pumps = list(range(n))
+        self._run(self._clean, which, pumps, background=background, allow_broken=True)
+
+    def clean_pump(self, number: int, background: bool = False) -> None:
+        """Clean one pump (#1-#N) the same way: 10 s forward. Not in the old UI - Kevin cleans
+        one pump at a time."""
+        if not 1 <= number <= self.dispenser_count:
+            raise CantPourError(f"no dispenser #{number}")
+        self._run(self._clean, f"#{number}", [number - 1], background=background, allow_broken=True)
 
     # ------------------------------------------------------------ internals
 
@@ -432,13 +444,8 @@ class Bot:
                     self.driver.set_motor_direction(i, p.MOTOR_DIRECTION_FORWARD)
         self._check()
 
-    def _clean(self, which: str) -> None:
+    def _clean(self, which: str, pumps: list[int]) -> None:
         self._set_state(State.CLEANING, f"cleaning ({which})")
-        n = self.dispenser_count
-        if n == 15 and which != "all":
-            pumps = CLEAN_LEFT if which == "left" else CLEAN_RIGHT
-        else:
-            pumps = list(range(n))
         self.driver.led_clean()
         started = []
         try:

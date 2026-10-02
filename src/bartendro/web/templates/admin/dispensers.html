@@ -26,6 +26,8 @@
       <button type="button" class="btn small plain" data-post="/api/dispenser/{{ d.number }}/run" data-body='{"ms": 4000, "reverse": true}'>Empty line</button>
       <button type="button" class="btn small" data-post="/api/dispenser/{{ d.number }}/run" data-body='{"ms": 2000}'>Prime</button>
       <button type="button" class="btn small go" data-post="/api/dispenser/{{ d.number }}/test">Test {{ amount(opts.test_dispense_ml) }}</button>
+      <button type="button" class="btn small plain" data-post="/api/dispenser/{{ d.number }}/clean"
+              data-confirm="Clean pump #{{ d.number }}? Take its hose out of the bottle and put it in cleaning solution first - the pump runs for 10 s.">Clean</button>
     </div>
     <label class="muted">ticks/ml <input class="pump-cal short" inputmode="decimal" value="{{ d.ticks_per_ml or '' }}" placeholder="2.78"></label>
   </div>
@@ -61,10 +63,14 @@
 
 <h3>Machine</h3>
 <div class="button-row">
-  <button class="btn" data-post="/api/clean" data-body='{"which": "all"}'>Clean all</button>
+  {% set warn = "the hoses out of the bottles and put them in cleaning solution first - the pumps run for 10 s." %}
+  <button class="btn" data-post="/api/clean" data-body='{"which": "all"}'
+          data-confirm="Clean every pump? Take all {{ warn }}">Clean all</button>
   {% if rows|length == 15 %}
-  <button class="btn" data-post="/api/clean" data-body='{"which": "left"}'>Clean left</button>
-  <button class="btn" data-post="/api/clean" data-body='{"which": "right"}'>Clean right</button>
+  <button class="btn" data-post="/api/clean" data-body='{"which": "left"}'
+          data-confirm="Clean the left bank (#5-#11)? Take {{ warn }}">Clean left</button>
+  <button class="btn" data-post="/api/clean" data-body='{"which": "right"}'
+          data-confirm="Clean the right bank (#1-#4, #12-#15)? Take {{ warn }}">Clean right</button>
   {% endif %}
   <button class="btn" data-post="/api/check-levels">Check levels</button>
   <button class="btn danger" data-post="/api/reset">Reset</button>

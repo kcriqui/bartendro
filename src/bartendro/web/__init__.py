@@ -640,6 +640,11 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
         bot.test_dispense(number, req.ml if req else None, background=True)
         return {"ok": True}
 
+    @app.post("/api/dispenser/{number}/clean", status_code=202)
+    def api_clean_pump(number: int):
+        bot.clean_pump(number, background=True)
+        return {"ok": True}
+
     @app.post("/api/dispenser/{number}/run", status_code=202)
     def api_run(number: int, req: RunRequest):
         bot.run_pump(number, req.ms, req.reverse, background=True)

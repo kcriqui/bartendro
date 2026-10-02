@@ -136,6 +136,10 @@ def test_shot_test_run_clean_reset(env):
     wait_idle(b)
     assert client.post("/api/clean", json={"which": "right"}).status_code == 202
     wait_idle(b)
+    assert client.post("/api/dispenser/6/clean").status_code == 202
+    wait_idle(b)
+    page = client.get("/admin").text  # the dispensers page
+    assert 'data-post="/api/dispenser/6/clean"' in page and "cleaning solution" in page
     assert client.post("/api/check-levels").status_code == 202
     wait_idle(b)
     assert client.post("/api/reset").json()["state"] == "ready"

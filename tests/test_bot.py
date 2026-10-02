@@ -339,3 +339,16 @@ def test_small_bot_cleans_all_pumps(sessions, monkeypatch):
     assert b.dispenser_count == 3
     with pytest.raises(CantPourError, match="no dispenser #4"):
         b.shot(4)
+
+
+def test_clean_one_pump(sessions, monkeypatch):
+    b, bus = make_bot(sessions)
+    started = []
+    real_start = b.driver.start
+    monkeypatch.setattr(b.driver, "start", lambda i: started.append(i) or real_start(i))
+    b.clean_pump(7)
+    assert started == [6]
+    assert not any(x.dispensing for x in bus.ports.values())
+    assert b.state is State.READY
+    with pytest.raises(CantPourError, match="no dispenser #16"):
+        b.clean_pump(16)
