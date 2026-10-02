@@ -1,0 +1,45 @@
+# Hosting a demo bot for people outside your network
+
+A fully working copy of the web app with **simulated pumps**, reachable from anywhere through
+Tailscale Funnel. Visitors only need a browser; Tailscale runs on the NAS. The demo starts from
+the showcase setup (bundled drinks, 15 bottles, a demo party) and resets on every restart.
+There's no login: anyone with the link can use everything, admin included; logo uploads are off.
+
+(For a look-only copy without a server there's the static site: `scripts/export_site.py`,
+https://kcriqui.github.io/bartendro/.)
+
+## 1. Run the container on TrueNAS
+
+Apps > Discover Apps > three-dots menu > **Install via YAML**, name `bartendro-demo`, paste
+[`deploy/truenas-demo.yaml`](../deploy/truenas-demo.yaml). TrueNAS builds the image from GitHub
+(a minute or two) and starts it on port **8077**: check `http://<nas>:8077` on your network.
+
+Without the TrueNAS UI (NAS shell):
+
+```
+docker build -t bartendro-demo https://github.com/kcriqui/bartendro.git#modernize
+docker run -d --name bartendro-demo --restart unless-stopped -p 8077:8080 bartendro-demo
+```
+
+New code: push to `modernize`, then in TrueNAS edit the app and save (it rebuilds:
+`pull_policy: build`), or `docker build ...` again and recreate the container.
+
+## 2. Make it public with Tailscale Funnel
+
+One-time, in the Tailscale admin console (you, not a script - these are tailnet security settings):
+- DNS > enable **HTTPS Certificates**.
+- Access controls: allow Funnel for the NAS (the console offers to add the `funnel` node
+  attribute the first time you run the command below; accept it).
+
+Then, in a shell where the NAS's `tailscale` command works (TrueNAS: Apps > tailscale > Shell):
+
+```
+tailscale funnel --bg 8077            # if the Tailscale app uses host networking
+tailscale funnel --bg http://<nas-lan-ip>:8077   # otherwise
+tailscale funnel status               # shows the public https://<nas>.<tailnet>.ts.net URL
+```
+
+Share that URL. Stop sharing: `tailscale funnel --https=443 off` (or `tailscale funnel reset`).
+
+Funnel hostnames appear in public certificate logs, so expect the odd crawler, not just the
+people you send the link to. Restart the app to undo whatever visitors changed.

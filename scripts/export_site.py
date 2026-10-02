@@ -24,9 +24,10 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from bartendro import showcase
 from bartendro.bot import Bot
-from bartendro.db import open_db, options, recipes
-from bartendro.db.models import Dispenser, Drink, Ingredient, Party, PartyDrink
+from bartendro.db import options
+from bartendro.db.models import Drink, Ingredient, Party
 from bartendro.hw.driver import Driver
 from bartendro.hw.simulator import SimBus
 from bartendro.web import create_app
@@ -34,35 +35,6 @@ from bartendro.web import create_app
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "build" / "pages"
 BASE = "/bartendro/"  # GitHub Pages path: kcriqui.github.io/bartendro/
-BOTTLES = ["Vodka", "Tequila", "White Rum", "Gin", "Rye Whiskey", "Triple Sec", "Coffee Liqueur",
-           "Campari", "Sweet Vermouth", "Lime Juice", "Lemon Juice", "Simple Syrup", "Orange Juice",
-           "Cranberry Juice", "Ginger Beer"]
-ON_HAND = ["Ice", "Angostura Bitters", "Peychaud's Bitters", "Absinthe", "Half and Half", "Mint",
-           "Lime", "Sugar", "Crushed Ice", "Cola", "Tonic Water", "Soda Water"]
-PARTY_DRINKS = ["Margarita", "Moscow Mule", "Cosmopolitan", "Negroni", "Screwdriver", "Cape Cod",
-                "Long Island Iced Tea", "Sazerac", "Mojito", "Shirley Temple"]
-
-
-def showcase_db(path: Path):
-    Session = open_db(path)
-    with Session() as s:
-        recipes.load(s)
-        ing = {i.name: i for i in s.scalars(select(Ingredient))}
-        for n, name in enumerate(BOTTLES, 1):
-            s.add(Dispenser(number=n, ingredient=ing[name]))
-        for name in ON_HAND:
-            ing[name].on_hand = True
-        drinks = {d.name: d for d in s.scalars(select(Drink))}
-        party = Party(name="Halloween (demo)", title="Spooky Bar", welcome="Boo! Pick a potion.",
-                      color_page="#1c1c24", color_frame="#6a2c91", color_heading="#d35400",
-                      color_button="#8e44ad", color_go="#e67e22", active=False)
-        party.drinks = [PartyDrink(drink=drinks[n], featured=i < 4, position=i)
-                        for i, n in enumerate(PARTY_DRINKS)]
-        s.add(party)
-        s.commit()
-    return Session
-
-
 def rewrite(html: str, base: str) -> str:
     """Root-relative links -> relative to <base>, so the site works under any path."""
     html = re.sub(r'(href|src|action)="/(?!/)', r'\1="', html)
@@ -82,7 +54,7 @@ def export(base: str = BASE) -> Path:
         shutil.rmtree(site)
     site.mkdir(parents=True)
     tmp = Path(tempfile.mkdtemp())
-    sessions = showcase_db(tmp / "showcase.db")
+    sessions = showcase.build(tmp / "showcase.db")
     bus = SimBus.with_dispensers(15)
     driver = Driver(bus.serial, bus.router)
     driver.discover()

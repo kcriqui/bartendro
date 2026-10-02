@@ -23,6 +23,7 @@
     <img class="robot" src="/static/img/partyrobot.png" alt="">
   </a>
 </header>
+{% if banner %}<div class="demo-banner">{{ banner }}</div>{% endif %}
 {% if demo %}<div class="demo-banner">Static demo of the new Bartendro software: nothing pours and nothing is
   saved. <a href="https://github.com/kcriqui/bartendro/tree/modernize">Source</a></div>{% endif %}
 <div id="statusbar" class="statusbar state-{{ status.state }}" data-state="{{ status.state }}">

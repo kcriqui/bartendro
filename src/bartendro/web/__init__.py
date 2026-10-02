@@ -91,10 +91,12 @@ class PreviewRequest(BaseModel):
 
 
 def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = None,
-               demo: bool = False) -> FastAPI:
+               demo: bool = False, banner: str = "", allow_uploads: bool = True) -> FastAPI:
     """`uploads`: folder for party logos (default: "uploads" next to the database).
     `demo`: pages for the static demo site (scripts/export_site.py): a banner, no live
-    connection, and static/demo.js standing in for the bot."""
+    connection, and static/demo.js standing in for the bot.
+    `banner`: a line shown on every page (the hosted demo bot: "simulated pumps").
+    `allow_uploads=False`: no logo uploads (a copy that's open to the internet)."""
     sessions = bot.sessions
     if uploads is None:
         db_file = sessions.kw["bind"].url.database
@@ -143,7 +145,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             response = templates.TemplateResponse(request, name, {
                 "bot_name": bot_name, "status": bot.status(), "opts": opts, "amount": amount,
                 "version": __version__, "nav": nav, "party": party, "theme_css": theme_css(party),
-                "demo": demo, **ctx})
+                "demo": demo, "banner": banner, "allow_uploads": allow_uploads, **ctx})
         preview = request.query_params.get("party")
         if preview is not None and preview.isdigit():
             if int(preview):
@@ -530,6 +532,8 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             logo = form.get("logo")
             if form.get("remove_logo"):
                 party.logo = ""
+            elif isinstance(logo, UploadFile) and logo.filename and not allow_uploads:
+                return JSONResponse({"error": "logo uploads are switched off on this bot"}, status_code=400)
             elif isinstance(logo, UploadFile) and logo.filename:
                 suffix = Path(logo.filename).suffix.lower()
                 data = await logo.read()

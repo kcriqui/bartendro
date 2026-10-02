@@ -21,7 +21,8 @@
   <h3>Logo</h3>
   {% if p.logo %}<p><img src="/uploads/{{ p.logo }}" alt="" style="max-height:60px"><br>
     <label class="check"><input type="checkbox" name="remove_logo"> Remove it (back to the Bartendro logo)</label></p>{% endif %}
-  <input type="file" name="logo" accept="image/*">
+  {% if allow_uploads %}<input type="file" name="logo" accept="image/*">
+  {% else %}<p class="hint">Logo uploads are switched off on this bot.</p>{% endif %}
 
   <h3>Drinks</h3>
   <p class="hint">Tick drinks to give this party its own menu (leave all unticked for every drink).
