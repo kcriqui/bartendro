@@ -24,12 +24,14 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    WebSocket pour status to every screen. No login (Kevin's call): anyone on the bot's WiFi
    can use admin. Kiosk on localhost + phones at the same time. Not done yet: old-db upload in
    the UI, liquid-level calibration page, "feeling lucky" / shotbot UI / turbo options.
-4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 54 drinks
+4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 55 drinks
    written for this project (amounts are facts from classic/IBA specs; no copied text - the
    GitHub IBA datasets are scrapes of IBA's site + Wikipedia, so not bundled; TheCocktailDB must
    not be redistributed). **Kevin's rules:**
    - The bot only pours liquids. The guest does the rest by hand, before the pour (absinthe
-     rinse, muddled mint/lime) or after (dashes of bitters, shake/stir per `finish`).
+     rinse, muddled mint/lime, ice) or after (dashes of bitters, shake/stir per `finish`).
+     Ice is a before-the-pour checklist line (`[1, "fill", "Ice", "before"]`), never "Over ice"
+     text; Ice starts on hand. Sazerac exists neat and "on the Rocks".
    - By-hand recipe lines: counted units (parts NULL: dash, leaf, wedge, tsp...) or measured
      amounts of `manual` ingredients (half and half / cream are never pumped - too hard to
      clean). `step` = before/after; the UI shows a checklist before pouring.

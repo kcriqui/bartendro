@@ -74,7 +74,9 @@ def test_classic_recipes_and_plan(env):
         godmother = s.scalar(select(Drink).where(Drink.name == "Godmother"))
         assert godmother.source == "classics"
     page = client.get(f"/drink/{godmother.id}").text
-    assert "old fashioned glass" in page and "Over ice." in page
+    assert "old fashioned glass" in page
+    plan = client.get(f"/api/drink/{godmother.id}/plan").json()
+    assert plan["before"] == [{"ingredient": "Ice", "ml": None, "text": "fill the glass with"}]
     plan = client.get(f"/api/drink/{godmother.id}/plan").json()  # Vodka #1, Amaretto #11
     assert {p["dispenser"] for p in plan["pumps"]} == {1, 11}
     assert "One step away" in client.get("/admin").text

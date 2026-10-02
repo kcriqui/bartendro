@@ -144,11 +144,14 @@ class RecipeItem(Base):
 # Counted amounts, always added by hand (singular: plural)
 HAND_UNITS = {"dash": "dashes", "drop": "drops", "barspoon": "barspoons", "pinch": "pinches",
               "splash": "splashes", "tsp": "tsp", "leaf": "leaves", "sprig": "sprigs",
-              "wedge": "wedges", "slice": "slices", "cube": "cubes", "piece": "pieces"}
+              "wedge": "wedges", "slice": "slices", "cube": "cubes", "piece": "pieces",
+              "fill": "fill"}  # "fill" (ice): "fill the glass with"
 STEPS = ("before", "after")
 
 
 def amount_text(amount: float | None, unit: str) -> str:
+    if unit == "fill":
+        return "fill the glass with"
     if amount is None:
         return unit
     n = f"{amount:g}"

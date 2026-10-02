@@ -33,9 +33,10 @@ def test_bundled_file_is_valid_and_simple():
     manual = {i["name"] for i in data["ingredient"] if i.get("manual")}
     for d in data["drink"]:
         # the bot pours a few liquids; the guest does the rest by hand, before or after
-        assert 2 <= len(d["ingredients"]) <= 8, d["name"]
         pumped = [(a, u, n) for a, u, n, *_ in d["ingredients"] if u in recipes.UNITS_ML and n not in manual]
-        hand = [n for a, u, n, *_ in d["ingredients"] if u not in recipes.UNITS_ML or n in manual]
+        assert 1 <= len(pumped) <= 8 and len(d["ingredients"]) >= 2, d["name"]
+        after = [n for a, u, n, *s in d["ingredients"]
+                 if (u not in recipes.UNITS_ML or n in manual) and s != ["before"]]
         assert pumped, d["name"]
         assert 45 <= sum(a * recipes.UNITS_ML[u] for a, u, _ in pumped) <= 250, d["name"]
         for a, u, n, *_ in d["ingredients"]:
@@ -44,11 +45,12 @@ def test_bundled_file_is_valid_and_simple():
         text = (d.get("instructions", "") + " " + d.get("description", "")).lower()
         for word in ("shake ", "strain", "blend"):
             assert word not in text, (d["name"], word)  # those belong in `finish`
-        if hand or "shaker" in text or "mixing glass" in text:
-            assert d.get("finish"), d["name"]
-        before = [n for a, u, n, *step in d["ingredients"] if step == ["before"]]
-        if before:
-            assert d.get("instructions"), d["name"]  # say what to do with them
+        if after or "shaker" in text or "mixing glass" in text:
+            assert d.get("finish"), d["name"]  # say what to do after the pour
+        prep = [n for a, u, n, *step in d["ingredients"] if step == ["before"] and u != "fill"]
+        if prep:
+            assert d.get("instructions"), d["name"]  # say what to do with the rinse / muddle
+        assert "over ice" not in d.get("instructions", "").lower(), d["name"]  # ice is a checklist line
 
 
 def test_sazerac(session):
@@ -69,7 +71,7 @@ def test_sazerac(session):
     ing(session, "Absinthe").on_hand = True
     session.commit()
     away = {i.name: (by_hand, {d.name for d in ds}) for i, by_hand, ds in one_bottle_away(session, limit=50)}
-    assert away["Peychaud's Bitters"] == (True, {"Sazerac"})
+    assert away["Peychaud's Bitters"] == (True, {"Sazerac", "Sazerac on the Rocks"})
     ing(session, "Peychaud's Bitters").on_hand = True
     session.commit()
     assert "Sazerac" in {d.name for d in makeable_drinks(session)}
@@ -108,14 +110,29 @@ def test_specific_spirits_are_not_replaced_by_generic(session):
     assert "Tequila Sunrise" in {d.name for d in makeable_drinks(session)}  # reposado does for tequila
 
 
+def test_ice_and_both_sazeracs(session):
+    recipes.load(session)
+    assert ing(session, "Ice").on_hand and not ing(session, "Crushed Ice").on_hand
+    screwdriver = drink(session, "Screwdriver")
+    first = screwdriver.items[0]
+    assert (first.ingredient.name, first.by_hand, first.step, first.hand_text) == \
+        ("Ice", True, "before", "fill the glass with")
+    assert first.parts is None  # ice isn't part of the mix: still 150 ml poured
+    assert screwdriver.size_ml == 150
+    neat, rocks = drink(session, "Sazerac"), drink(session, "Sazerac on the Rocks")
+    assert "Ice" not in {i.ingredient.name for i in neat.items}
+    assert [i.ingredient.name for i in rocks.items if i.step == "before"] == ["Absinthe", "Ice"]
+    assert "No ice" in neat.instructions
+
+
 def test_muddled_drinks_have_before_steps(session):
     recipes.load(session)
     mojito = drink(session, "Mojito")
     before = [(i.ingredient.name, i.hand_text) for i in mojito.items if i.by_hand and i.step == "before"]
-    assert before == [("Mint", "6 leaves")]
+    assert before == [("Mint", "6 leaves"), ("Ice", "fill the glass with")]
     caip = drink(session, "Caipirinha")
     assert [(i.ingredient.name, i.hand_text) for i in caip.items if i.by_hand] == \
-        [("Lime", "4 wedges"), ("Sugar", "2 tsp")]
+        [("Lime", "4 wedges"), ("Sugar", "2 tsp"), ("Crushed Ice", "fill the glass with")]
     wr = drink(session, "White Russian")
     cream = [i for i in wr.items if i.ingredient.name == "Half and Half"][0]
     assert cream.by_hand and cream.parts == 30 and cream.step == "after"  # measured, by hand
@@ -130,7 +147,7 @@ def test_load_into_empty_database(session):
     assert screwdriver.source == "classics" and screwdriver.popular and screwdriver.glass == "highball"
     assert screwdriver.size_ml == 150 and drink(session, "Godmother").size_ml == 70
     assert [(i.ingredient.name, i.parts, i.amount, i.unit) for i in screwdriver.items] == \
-        [("Vodka", 50, 50, "ml"), ("Orange Juice", 100, 100, "ml")]
+        [("Ice", None, 1, "fill"), ("Vodka", 50, 50, "ml"), ("Orange Juice", 100, 100, "ml")]
     assert ing(session, "Scotch Whisky").generic is ing(session, "Whiskey")
     # loading again changes nothing
     again = recipes.load(session)
@@ -142,7 +159,7 @@ def test_load_into_empty_database(session):
 def test_update_refreshes_only_classics(session):
     recipes.load(session)
     d = drink(session, "Screwdriver")
-    d.items[0].parts = 99
+    d.items[1].parts = 99
     d.description = "changed"
     session.commit()
     recipes.load(session)  # without update: left alone
@@ -150,7 +167,7 @@ def test_update_refreshes_only_classics(session):
     report = recipes.load(session, update=True)
     assert report.counts["drinks updated"] == len(recipes.read()["drink"])
     d = drink(session, "Screwdriver")
-    assert d.description != "changed" and d.items[0].parts == 50
+    assert d.description != "changed" and d.items[1].parts == 50
 
 
 def test_load_into_imported_old_database(session):

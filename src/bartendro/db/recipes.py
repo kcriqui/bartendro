@@ -133,7 +133,7 @@ def load(session: Session, path: str | Path | None = None, update: bool = False)
         else:
             found = Ingredient(name=spec["name"], kind=Kind(spec.get("kind", "other")),
                                abv=float(spec.get("abv", 0)), manual=bool(spec.get("manual", False)),
-                               on_hand=False)  # tick it in Admin once you have it
+                               on_hand=bool(spec.get("on_hand", False)))  # else tick it in Admin
             session.add(found)
             by_name[_norm(found.name)] = found
             report.counts["ingredients added"] += 1
