@@ -95,7 +95,7 @@ def test_brand_on_dispenser_pours_generic_recipe(sessions):
     b, bus = make_bot(sessions)
     with sessions() as s:
         vodka = s.get(Ingredient, 1)
-        titos = Ingredient(name="Tito's", kind=Kind.ALCOHOL, generic=vodka)
+        titos = Ingredient(name="Tito's", alcoholic=True, abv=40, generic=vodka)
         s.add(titos)
         s.flush()
         s.get(Dispenser, 1).ingredient = titos  # #1 now holds Tito's, recipes still say Vodka
@@ -141,6 +141,79 @@ def test_hand_added_dashes_and_finish(sessions):
     done = b.events[-2]
     assert done["type"] == "done" and done["after"] == [["Angostura", None, "2 dashes"]]
     assert done["finish"] == "Stir."
+
+
+def test_bitters_pumped_when_on_a_dispenser_else_by_hand(sessions):
+    b, bus = make_bot(sessions)
+    with sessions() as s:
+        bitters = Ingredient(name="Bitters", abv=45, alcoholic=True)  # not "never pumped"
+        whiskey = s.scalar(select(Ingredient).where(Ingredient.name == "Whiskey"))  # dispenser #15
+        s.add(Drink(id=503, name="Whiskey Bitters", size_ml=60, items=[
+            RecipeItem(ingredient=whiskey, parts=60, position=0),
+            RecipeItem(ingredient=bitters, parts=None, amount=2, unit="dash", position=1)]))
+        s.commit()
+    with pytest.raises(CantPourError, match="Bitters isn't on hand"):
+        b.plan_drink(503)
+    with sessions() as s:  # put the bitters on pump #14
+        s.get(Dispenser, 14).ingredient_id = s.scalar(select(Ingredient.id).where(Ingredient.name == "Bitters"))
+        s.commit()
+    plan = b.plan_drink(503)
+    assert plan.pumps == pytest.approx({15: 60, 14: 1.8}) and plan.after == []  # 2 dashes = 1.8 ml
+    with sessions() as s:  # too little to pump accurately, and it's on hand: by hand instead
+        options.set(s, "min_pump_ml", 2)
+        s.scalar(select(Ingredient).where(Ingredient.name == "Bitters")).on_hand = True
+        s.commit()
+    plan = b.plan_drink(503)
+    assert plan.pumps == pytest.approx({15: 60}) and [h.text for h in plan.after] == ["2 dashes"]
+
+
+def test_pumped_rinse_pours_in_two_stages(sessions):
+    b, bus = make_bot(sessions)
+    with sessions() as s:
+        absinthe = Ingredient(name="Absinthe", abv=60, alcoholic=True)
+        ice = Ingredient(name="Ice", manual=True, on_hand=True)
+        whiskey = s.scalar(select(Ingredient).where(Ingredient.name == "Whiskey"))
+        s.add(Drink(id=504, name="Rinsed", size_ml=60, instructions="Swirl and discard.", items=[
+            RecipeItem(ingredient=absinthe, parts=None, amount=1, unit="dash", step="before", position=0),
+            RecipeItem(ingredient=ice, parts=None, amount=1, unit="fill", step="before", position=1),
+            RecipeItem(ingredient=whiskey, parts=60, position=2)]))
+        s.flush()
+        s.get(Dispenser, 13).ingredient = absinthe
+        s.commit()
+    plan = b.plan_drink(504)
+    assert plan.pre_pumps == pytest.approx({13: 0.9}) and plan.pumps == pytest.approx({15: 60})
+    assert [h.ingredient for h in plan.before] == ["Ice"]
+    b.make_drink(504, background=True)
+    for _ in range(500):
+        if any(e["type"] == "stage_done" for e in b.events):
+            break
+        threading.Event().wait(0.01)
+    stage = next(e for e in b.events if e["type"] == "stage_done")
+    assert stage["instructions"] == "Swirl and discard." and stage["before"][0][0] == "Ice"
+    assert bus.ports[12].poured_ticks > 0 and bus.ports[14].poured_ticks == 0  # rinse only, so far
+    assert b.status()["busy"]
+    b.continue_pour()
+    for _ in range(500):
+        if not b.status()["busy"]:
+            break
+        threading.Event().wait(0.01)
+    assert bus.ports[14].poured_ticks == int(60 * TICKS_PER_ML)
+    assert b.events[-2]["type"] == "done"
+    # cancelling between the stages pours nothing more
+    b.make_drink(504, background=True)
+    for _ in range(500):
+        if b._waiting:
+            break
+        threading.Event().wait(0.01)
+    b.continue_pour(cancel=True)
+    for _ in range(500):
+        if not b.status()["busy"]:
+            break
+        threading.Event().wait(0.01)
+    assert bus.ports[14].poured_ticks == int(60 * TICKS_PER_ML)
+    assert any(e["type"] == "cancelled" for e in b.events)
+    with pytest.raises(CantPourError, match="nothing is waiting"):
+        b.continue_pour()
 
 
 def test_busy(sessions, monkeypatch):

@@ -174,10 +174,10 @@ def test_admin_drink_edit(env):
 def test_admin_ingredient_edit(env):
     client, _, _, sessions = env
     client.post("/admin/ingredient/new", data={"name": "Tito's", "brand": "Tito's", "abv": "40",
-                                               "kind": "alcohol", "generic_id": "1"})
+                                               "alcoholic": "on", "generic_id": "1"})
     with sessions() as s:
         titos = s.scalar(select(Ingredient).where(Ingredient.name == "Tito's"))
-        assert titos.generic.name == "Vodka" and titos.kind.value == "alcohol"
+        assert titos.generic.name == "Vodka" and titos.alcoholic
         titos_id = titos.id
     r = client.post("/admin/ingredient/1", data={"delete": "1"})  # vodka is used
     assert r.status_code == 400
@@ -215,7 +215,10 @@ def test_hand_added_amounts_in_admin_and_plan(env):
         assert [(i.ingredient_id, i.parts, i.hand_text) for i in d.items] == \
             [(7, 50, "50 ml"), (1, None, "3 dashes")]
     plan = client.get(f"/api/drink/{manhattan}/plan").json()
-    assert "error" in plan and "on hand" in plan["error"]  # vodka isn't ticked "on hand"
+    # vodka is on pump #1, so the 3 dashes are pumped (2.7 ml)...
+    assert {"dispenser": 1, "ingredient": "Vodka", "ml": 2.7} in plan["pumps"]
+    # ...unless that's below min_pump_ml and it's on hand: then the guest adds them
+    client.post("/admin/options", data={"min_pump_ml": "5", "show_size": "on"})
     client.post("/admin/on-hand", data={"listed": ["1"], "on_hand": ["1"]})
     plan = client.get(f"/api/drink/{manhattan}/plan").json()
     assert plan["after"] == [{"ingredient": "Vodka", "ml": None, "text": "3 dashes"}]

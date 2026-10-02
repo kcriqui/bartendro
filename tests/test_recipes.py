@@ -5,8 +5,10 @@ from sqlalchemy import func, select
 
 from bartendro.db import open_db
 from bartendro.db import recipes
+from bartendro.db.models import PUMP_ML
 from bartendro.db.importer import import_legacy
-from bartendro.db.menu import makeable_drinks, one_bottle_away, suggest_bottles
+from bartendro.db.menu import (LIQUEURS, NON_ALCOHOLIC, by_category, category_of, makeable_drinks,
+                               one_bottle_away, suggest_bottles)
 from bartendro.db.models import Dispenser, Drink, Ingredient
 
 DEFAULT_DB = Path(__file__).parent.parent / "ui" / "bartendro.db.default"
@@ -40,8 +42,8 @@ def test_bundled_file_is_valid_and_simple():
         assert pumped, d["name"]
         assert 45 <= sum(a * recipes.UNITS_ML[u] for a, u, _ in pumped) <= 250, d["name"]
         for a, u, n, *_ in d["ingredients"]:
-            if u not in recipes.UNITS_ML:
-                assert n in manual, (d["name"], n)  # counted amounts are never pumped
+            if u not in recipes.UNITS_ML and u not in PUMP_ML:
+                assert n in manual, (d["name"], n)  # leaves, wedges, ice: never pumped
         text = (d.get("instructions", "") + " " + d.get("description", "")).lower()
         for word in ("shake ", "strain", "blend"):
             assert word not in text, (d["name"], word)  # those belong in `finish`
@@ -56,10 +58,10 @@ def test_bundled_file_is_valid_and_simple():
 def test_sazerac(session):
     recipes.load(session)
     saz = drink(session, "Sazerac")
-    pumped = [(i.ingredient.name, i.parts) for i in saz.items if not i.by_hand]
-    by_hand = [(i.ingredient.name, i.hand_text, i.step) for i in saz.items if i.by_hand]
-    assert pumped == [("Rye Whiskey", 60), ("Simple Syrup", 7.5)]
-    assert by_hand == [("Absinthe", "1 dash", "before"), ("Peychaud's Bitters", "3 dashes", "after")]
+    measured = [(i.ingredient.name, i.parts) for i in saz.items if i.parts is not None]
+    counted = [(i.ingredient.name, i.hand_text, i.step) for i in saz.items if i.parts is None]
+    assert measured == [("Rye Whiskey", 60), ("Simple Syrup", 7.5)]
+    assert counted == [("Absinthe", "1 dash", "before"), ("Peychaud's Bitters", "3 dashes", "after")]
     assert saz.size_ml == 68 and "absinthe" in saz.instructions.lower()
     session.add_all([Dispenser(number=1, ingredient=ing(session, "Rye Whiskey")),
                      Dispenser(number=2, ingredient=ing(session, "Simple Syrup"))])
@@ -135,8 +137,8 @@ def test_muddled_drinks_have_before_steps(session):
         [("Lime", "4 wedges"), ("Sugar", "2 tsp"), ("Crushed Ice", "fill the glass with")]
     wr = drink(session, "White Russian")
     cream = [i for i in wr.items if i.ingredient.name == "Half and Half"][0]
-    assert cream.by_hand and cream.parts == 30 and cream.step == "after"  # measured, by hand
-    assert ing(session, "Half and Half").manual and not ing(session, "Half and Half").on_hand
+    assert cream.pumpable and cream.parts == 30 and cream.step == "after"  # pumped or by hand
+    assert not ing(session, "Half and Half").manual and not ing(session, "Half and Half").on_hand
 
 
 def test_load_into_empty_database(session):
@@ -223,3 +225,28 @@ def test_one_bottle_away(session):
     assert away["Orange Juice"] == {"Screwdriver"}
     assert away["Tonic Water"] == {"Vodka Tonic"}
     assert "Gin" not in away  # gin drinks need more than one more bottle
+
+
+def test_categories(session):
+    recipes.load(session)
+    cat = {d.name: category_of(d) for d in session.scalars(select(Drink))}
+    assert cat["Screwdriver"] == "Vodka" and cat["Godmother"] == "Vodka"   # most alcohol wins
+    assert cat["Margarita"] == "Tequila" and cat["Tequila Old Fashioned"] == "Tequila"  # Reposado
+    assert cat["Sazerac"] == "Whiskey" and cat["Rusty Nail"] == "Whiskey"  # Rye, Scotch
+    assert cat["Cuba Libre"] == "Rum" and cat["Dark 'n' Stormy"] == "Rum"
+    assert cat["Sidecar"] == "Brandy"
+    assert cat["Kir"] == LIQUEURS and cat["Aperol Spritz"] == LIQUEURS and cat["Fuzzy Navel"] == LIQUEURS
+    assert cat["Shirley Temple"] == NON_ALCOHOLIC and cat["Virgin Mary"] == NON_ALCOHOLIC
+    d = drink(session, "Godmother")
+    d.category = "Party specials"
+    assert category_of(d) == "Party specials"
+    sections = list(by_category(list(session.scalars(select(Drink)))))
+    assert sections[-2:] == [LIQUEURS, NON_ALCOHOLIC] and sections[0] < sections[1]
+
+
+def test_non_alcoholic_drinks_have_no_alcohol():
+    data = recipes.read()
+    abv = {i["name"]: i.get("abv", 0) for i in data["ingredient"]}
+    soft = [d for d in data["drink"] if not any(abv[n] for a, u, n, *_ in d["ingredients"])]
+    assert len(soft) >= 7
+    assert {"Shirley Temple", "Virgin Mary", "Nojito"} <= {d["name"] for d in soft}

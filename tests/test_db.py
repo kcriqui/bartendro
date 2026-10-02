@@ -71,7 +71,9 @@ def test_upgrade_keeps_data(tmp_path):
     c.close()
     upgrade(engine)
     c = sqlite3.connect(path)
-    assert c.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0004"
+    assert c.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0005"
+    assert c.execute("SELECT name, kind, alcoholic FROM ingredient ORDER BY id").fetchall() == \
+        [("Vodka", "other", 1), ("Titos", "other", 1), ("Mint", "other", 0)]  # kind alcohol -> alcoholic
     assert c.execute("SELECT count(*) FROM recipe_item").fetchone()[0] == 2
     assert c.execute("SELECT drink_id FROM pour_log ORDER BY id").fetchall() == [(1,), (None,)]
     assert c.execute("SELECT generic_id FROM ingredient WHERE id = 2").fetchone()[0] == 1
@@ -165,7 +167,8 @@ def test_import_default_database(session):
                              "dispensers": 15, "options": 14, "log entries": 0}
 
     vodka = session.get(Ingredient, 1)
-    assert (vodka.name, vodka.kind, vodka.abv) == ("Vodka", Kind.ALCOHOL, 40.0)
+    assert (vodka.name, vodka.alcoholic, vodka.abv) == ("Vodka", True, 40.0)
+    assert session.get(Ingredient, 4).name == "Orange Juice" and not session.get(Ingredient, 4).alcoholic
     assert session.get(Dispenser, 1).ingredient is vodka
     assert session.get(Dispenser, 1).level is Level.UNKNOWN  # sensors were off
     martini = session.get(Drink, 1)
@@ -318,7 +321,9 @@ def test_menu_sorting_and_disabled_drinks(tmp_path, session):
 def _drink(session, *items):
     d = Drink(name="test")
     for n, (kind, parts, manual) in enumerate(items):
-        ing = Ingredient(name=f"i{n}", kind=kind, manual=manual)
+        alcoholic = kind == "booze"
+        ing = Ingredient(name=f"i{n}", kind=Kind.OTHER if alcoholic else kind, alcoholic=alcoholic,
+                         manual=manual)
         d.items.append(RecipeItem(ingredient=ing, parts=parts))
     session.add(d)
     session.flush()
@@ -326,7 +331,7 @@ def _drink(session, *items):
 
 
 def test_scale_recipe(session):
-    d, (vodka, lime, syrup) = _drink(session, (Kind.ALCOHOL, 2, False), (Kind.TART, 1, False),
+    d, (vodka, lime, syrup) = _drink(session, ("booze", 2, False), (Kind.TART, 1, False),
                                      (Kind.SWEET, 1, False))
     assert scale_recipe(d, 160) == pytest.approx({vodka: 80, lime: 40, syrup: 40})
     # stronger: alcohol 2 * 1.25 = 2.5 parts of 4.5
@@ -336,9 +341,9 @@ def test_scale_recipe(session):
 
 
 def test_scale_recipe_leaves_out_manual_ingredients(session):
-    d, (rum, mint) = _drink(session, (Kind.ALCOHOL, 3, False), (Kind.OTHER, 1, True))
-    assert scale_recipe(d, 120) == pytest.approx({rum: 90})  # mint still counts toward the mix
-    assert scale_recipe(d, 120, include_manual=True) == pytest.approx({rum: 90, mint: 30})
+    d, (rum, mint) = _drink(session, ("booze", 3, False), (Kind.OTHER, 1, True))
+    assert scale_recipe(d, 120, include_manual=False) == pytest.approx({rum: 90})  # mint counts toward the mix
+    assert scale_recipe(d, 120) == pytest.approx({rum: 90, mint: 30})
 
 
 # ------------------------------------------------------------------ CLI
@@ -347,7 +352,7 @@ def test_scale_recipe_leaves_out_manual_ingredients(session):
 def test_dbcli(tmp_path, capsys):
     db = str(tmp_path / "cli.db")
     assert dbcli(["--db", db, "upgrade"]) == 0
-    assert "schema none -> 0004" in capsys.readouterr().out
+    assert "schema none -> 0005" in capsys.readouterr().out
     assert dbcli(["--db", db, "import", str(DEFAULT_DB)]) == 0
     assert "83 drinks" in capsys.readouterr().out
     assert dbcli(["--db", db, "import", str(DEFAULT_DB)]) == 2  # already has data

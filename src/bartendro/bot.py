@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .db import options
-from .db.menu import makeable_drinks, pumped_and_on_hand, scale_recipe
+from .db.menu import HAND, PUMP, makeable_drinks, pumped_and_on_hand, resolve_line, scale_recipe
 from .db.models import Dispenser, Drink, Ingredient, Level, PourLog
 from .hw import protocol as p
 from .hw.driver import MAX_DISPENSE_ML, DriverError, OverCurrentError
@@ -42,6 +42,7 @@ CLEAN_LEFT = [4, 5, 6, 7, 8, 9, 10]          # dispenser indexes on a 15-pump bo
 CLEAN_RIGHT = [0, 1, 2, 3, 11, 12, 13, 14]
 LED_DONE_SECONDS = 5  # the "drink done" LED pattern shows this long, then back to idle
 MIN_DRINK_ML = 10
+CONTINUE_TIMEOUT = 300  # s to wait for the guest between two pour stages
 LOCK_WAIT = 0.25  # s an action waits for the lock before reporting busy
 RUN_PUMP_MAX_MS = 60_000  # longest manual pump run (priming a long line)
 
@@ -100,10 +101,13 @@ class Plan:
     before: list[HandStep] = field(default_factory=list)  # ...and these first (absinthe rinse, mint)
     instructions: str = ""  # what goes under the spout, e.g. "Pour into a shaker."
     finish: str = ""        # e.g. "Shake with ice and strain."
+    # "before" lines that are on a pump (an absinthe rinse from a dispenser): poured first, then
+    # the guest does the before steps and presses Continue, then the rest is poured.
+    pre_pumps: dict[int, float] = field(default_factory=dict)
 
     @property
     def pumped_ml(self) -> float:
-        return sum(self.pumps.values())
+        return sum(self.pumps.values()) + sum(self.pre_pumps.values())
 
 
 class Bot:
@@ -116,6 +120,9 @@ class Bot:
         self._lock = threading.Lock()     # held for the whole of any action that moves pumps
         self._listeners: list = []
         self._led_timer: threading.Timer | None = None
+        self._go_on = threading.Event()   # the guest pressed Continue between two pour stages
+        self._waiting = False
+        self._cancelled = False
 
     # ------------------------------------------------------------ status / events
 
@@ -176,23 +183,31 @@ class Bot:
             size = float(size_ml or default)
             if not MIN_DRINK_ML <= size <= MAX_DISPENSE_ML:
                 raise CantPourError(f"drink size must be {MIN_DRINK_ML}-{MAX_DISPENSE_ML} ml")
-            amounts = scale_recipe(drink, size, strength, tartness, include_manual=True)
-            if not amounts:
-                raise CantPourError(f"{drink.name} has nothing for the pumps to pour")
+            amounts = scale_recipe(drink, size, strength, tartness)
             plan = Plan(drink.id, drink.name, size, {}, instructions=drink.instructions,
                         finish=drink.finish)
-            _, on_hand = pumped_and_on_hand(s, self.dispenser_count)
+            pumped, on_hand = pumped_and_on_hand(s, self.dispenser_count)
+            min_ml = float(options.get(s, "min_pump_ml"))
             for item in drink.items:
-                if item.by_hand:
-                    if item.ingredient_id not in on_hand:
-                        raise CantPourError(f"{item.ingredient.name} isn't on hand")
-                    step = (HandStep(item.ingredient.name, text=item.hand_text) if item.parts is None
-                            else HandStep(item.ingredient.name, amounts[item.ingredient_id]))
+                name = item.ingredient.name
+                how = resolve_line(item, pumped, on_hand)
+                if how is None:
+                    if item.pumpable and item.parts is not None:
+                        self._dispenser_for(s, item.ingredient)  # raises "no dispenser has X" / "X is out"
+                    raise CantPourError(f"{name} isn't on hand")
+                ml = item.pump_ml(amounts.get(item.ingredient_id)) if how == PUMP else 0.0
+                if how == PUMP and ml < min_ml and item.ingredient_id in on_hand:
+                    how = HAND  # too little to pump accurately: the guest adds it
+                if how == HAND:
+                    step = (HandStep(name, text=item.hand_text) if item.parts is None
+                            else HandStep(name, amounts[item.ingredient_id]))
                     (plan.before if item.step == "before" else plan.after).append(step)
                     continue
-                ml = amounts[item.ingredient_id]
                 number = self._dispenser_for(s, item.ingredient)
-                plan.pumps[number] = plan.pumps.get(number, 0) + ml
+                target = plan.pre_pumps if item.step == "before" else plan.pumps
+                target[number] = target.get(number, 0) + ml
+            if not plan.pumps:
+                raise CantPourError(f"{drink.name} has nothing for the pumps to pour")
             return plan
 
     def make_drink(self, drink_id: int, size_ml: float | None = None, strength: int = 0,
@@ -310,21 +325,47 @@ class Bot:
             raise CantPourError(f"{ingredient.name} is out")
         return usable[0][1]
 
+    def continue_pour(self, cancel: bool = False) -> None:
+        """The guest finished the between-stages steps (or gave up: `cancel`)."""
+        if not self._waiting:
+            raise CantPourError("nothing is waiting to continue")
+        self._cancelled = cancel
+        self._go_on.set()
+
+    def _pump(self, plan: Plan, pumps: dict[int, float], fast: bool = False) -> None:
+        with self.sessions() as s:
+            cal = {n - 1: d.ticks_per_ml for n in pumps
+                   if (d := s.get(Dispenser, n)) is not None and d.ticks_per_ml}
+        t0 = time.monotonic()
+        self.driver.pour_ml({n - 1: ml for n, ml in pumps.items()}, always_fast=fast, ticks_per_ml=cal)
+        log.info("poured %s: %s in %.1f s", plan.name,
+                 ", ".join(f"#{n} {ml:.1f} ml" for n, ml in sorted(pumps.items())),
+                 time.monotonic() - t0)
+
     def _pour(self, plan: Plan, shot_ingredient: int | None = None, test: bool = False) -> None:
         self.current = plan
         self._set_state(State.POURING, plan.name)
-        self._emit({"type": "pouring", "name": plan.name, "ml": round(plan.pumped_ml),
-                    "after": [h.as_list() for h in plan.after], "finish": plan.finish})
-        with self.sessions() as s:
-            cal = {n - 1: d.ticks_per_ml for n in plan.pumps
-                   if (d := s.get(Dispenser, n)) is not None and d.ticks_per_ml}
         self.driver.led_dispense()
-        t0 = time.monotonic()
-        self.driver.pour_ml({n - 1: ml for n, ml in plan.pumps.items()}, always_fast=test,
-                            ticks_per_ml=cal)
-        log.info("poured %s: %s in %.1f s", plan.name,
-                 ", ".join(f"#{n} {ml:.0f} ml" for n, ml in sorted(plan.pumps.items())),
-                 time.monotonic() - t0)
+        if plan.pre_pumps:
+            self._emit({"type": "pouring", "name": plan.name, "ml": round(sum(plan.pre_pumps.values()), 1),
+                        "stage": 1})
+            self._pump(plan, plan.pre_pumps)
+            self._go_on.clear()
+            self._cancelled, self._waiting = False, True
+            self._emit({"type": "stage_done", "name": plan.name, "instructions": plan.instructions,
+                        "before": [h.as_list() for h in plan.before]})
+            try:
+                went_on = self._go_on.wait(CONTINUE_TIMEOUT)
+            finally:
+                self._waiting = False
+            if not went_on or self._cancelled:
+                self.driver.led_idle()
+                self._emit({"type": "cancelled", "name": plan.name})
+                self._check()
+                return
+        self._emit({"type": "pouring", "name": plan.name, "ml": round(sum(plan.pumps.values())),
+                    "after": [h.as_list() for h in plan.after], "finish": plan.finish})
+        self._pump(plan, plan.pumps, fast=test)
         self.driver.led_complete()
         self._led_timer = threading.Timer(LED_DONE_SECONDS, self._led_idle_if_free)
         self._led_timer.daemon = True

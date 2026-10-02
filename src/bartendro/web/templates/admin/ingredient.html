@@ -10,9 +10,12 @@
   <label>Kind <select name="kind">
     {% for k in kinds %}<option value="{{ k.value }}" {% if k == ing.kind %}selected{% endif %}>{{ k.value }}</option>{% endfor %}
   </select></label>
-  <p class="hint">Strength changes alcohol; tartness raises tart and lowers sweet ingredients.</p>
+  <label class="check"><input type="checkbox" name="alcoholic" {% if ing.alcoholic %}checked{% endif %}>
+    Alcoholic (booze, not a mixer)</label>
+  <p class="hint">Strength changes alcoholic ingredients; tartness raises tart and lowers sweet ones.</p>
   <label class="check"><input type="checkbox" name="manual" {% if ing.manual %}checked{% endif %}>
-    Added by hand (never pumped: bitters, mint, dairy...)</label>
+    Never on a pump (ice, mint, lime wedges...). Leave unticked for things that can be either,
+    like bitters or half and half: pumped when on a dispenser, else added by hand.</label>
   <label class="check"><input type="checkbox" name="on_hand" {% if ing.on_hand %}checked{% endif %}>
     On hand (the guest can add it by hand right now)</label>
   <label>A brand of <select name="generic_id">

@@ -27,10 +27,10 @@ from sqlalchemy.orm import Session
 from . import options
 from .models import Dispenser, Drink, Ingredient, Kind, Level, Option, PourLog, RecipeItem
 
-# old booze.type -> (kind, manual)
+# old booze.type -> (kind, manual); type 1 "Alcohol" (and any ABV) makes it alcoholic
 BOOZE_TYPES = {
     0: (Kind.OTHER, False),    # Unknown
-    1: (Kind.ALCOHOL, False),  # Alcohol
+    1: (Kind.OTHER, False),    # Alcohol
     2: (Kind.TART, False),     # Tart
     3: (Kind.SWEET, False),    # Sweet
     4: (Kind.OTHER, True),     # External: added by hand, never pumped
@@ -149,9 +149,10 @@ def _import_ingredients(old: _Old, session: Session, report: Report) -> None:
         if old_type not in BOOZE_TYPES:
             report.warn(f"booze {r['id']} {name!r}: unknown type {old_type}, imported as 'other'")
         kind, manual = BOOZE_TYPES.get(old_type, (Kind.OTHER, False))
+        abv = float(_get(r, "abv", 0) or 0)
         session.add(Ingredient(id=r["id"], name=name, brand=_text(_get(r, "brand")),
-                               description=_text(_get(r, "desc")), abv=float(_get(r, "abv", 0)),
-                               kind=kind, manual=manual, on_hand=manual))
+                               description=_text(_get(r, "desc")), abv=abv, kind=kind,
+                               alcoholic=old_type == 1 or abv > 0, manual=manual, on_hand=manual))
         ids.add(r["id"])
     session.flush()
     report.counts["ingredients"] = len(ids)

@@ -10,7 +10,7 @@
     <td><a href="/admin/ingredient/{{ i.id }}">{{ i.name }}</a>
       {% if i.manual %}<span class="muted">by hand</span>{% endif %}
       {% if i.id not in used %}<span class="muted">unused</span>{% endif %}</td>
-    <td>{{ i.kind.value }}</td>
+    <td>{{ "booze" if i.alcoholic else "mixer" }}{% if i.kind.value != "other" %}, {{ i.kind.value }}{% endif %}</td>
     <td class="num">{{ "%g" % i.abv }}%</td>
     <td>{{ i.generic.name if i.generic else "" }}</td>
   </tr>

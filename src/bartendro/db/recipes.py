@@ -54,7 +54,7 @@ def _validate(data: dict, p: Path) -> None:
     for ing in data.get("ingredient", []):
         if not ing.get("name"):
             raise RecipeFileError(f"{p}: an [[ingredient]] has no name")
-        if ing.get("kind", "other") not in {k.value for k in Kind}:
+        if ing.get("kind", "other") not in {k.value for k in Kind} | {"alcohol"}:
             raise RecipeFileError(f"{p}: {ing['name']}: unknown kind {ing['kind']!r}")
         names.add(ing["name"].lower())
         if ing.get("manual"):
@@ -131,8 +131,11 @@ def load(session: Session, path: str | Path | None = None, update: bool = False)
             if _norm(found.name) != _norm(spec["name"]):
                 report.notes.append(f"using your {found.name!r} for {spec['name']!r}")
         else:
-            found = Ingredient(name=spec["name"], kind=Kind(spec.get("kind", "other")),
-                               abv=float(spec.get("abv", 0)), manual=bool(spec.get("manual", False)),
+            kind = spec.get("kind", "other")
+            abv = float(spec.get("abv", 0))
+            found = Ingredient(name=spec["name"], kind=Kind.OTHER if kind == "alcohol" else Kind(kind),
+                               abv=abv, alcoholic=bool(spec.get("alcoholic", abv > 0 or kind == "alcohol")),
+                               manual=bool(spec.get("manual", False)),
                                on_hand=bool(spec.get("on_hand", False)))  # else tick it in Admin
             session.add(found)
             by_name[_norm(found.name)] = found

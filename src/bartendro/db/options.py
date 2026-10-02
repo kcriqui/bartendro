@@ -21,6 +21,7 @@ DEFAULTS: dict[str, bool | int | str] = {
     "taster_size": 30,      # ml
     "shot_size": 30,        # ml
     "test_dispense_ml": 10,
+    "min_pump_ml": 1,       # smaller pumped amounts are added by hand instead, if on hand
     "show_strength": True,
     "show_size": True,
     "show_taster": False,

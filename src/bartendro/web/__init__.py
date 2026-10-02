@@ -272,7 +272,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
     def admin_ingredient(request: Request, ing_id: str):
         with sessions() as s:
             ing = Ingredient(name="", brand="", description="", abv=0, kind=Kind.OTHER, manual=False,
-                             on_hand=False) \
+                             on_hand=False, alcoholic=False) \
                 if ing_id == "new" else s.get(Ingredient, int(ing_id))
             if ing is None:
                 return RedirectResponse("/admin/ingredients", status_code=303)
@@ -306,6 +306,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
             ing.abv = float(form.get("abv") or 0)
             ing.kind = Kind(form.get("kind", "other"))
             ing.manual = bool(form.get("manual"))
+            ing.alcoholic = bool(form.get("alcoholic"))
             ing.on_hand = bool(form.get("on_hand"))
             generic = form.get("generic_id", "")
             ing.generic_id = int(generic) if generic and generic != str(ing.id) else None
@@ -365,6 +366,8 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
         return {"name": plan.name, "size_ml": plan.size_ml,
                 "pumps": [{"dispenser": n, "ingredient": names.get(n, "?"), "ml": round(ml, 1)}
                           for n, ml in sorted(plan.pumps.items())],
+                "pre_pumps": [{"dispenser": n, "ingredient": names.get(n, "?"), "ml": round(ml, 1)}
+                              for n, ml in sorted(plan.pre_pumps.items())],
                 "before": [_hand(h) for h in plan.before], "after": [_hand(h) for h in plan.after],
                 "instructions": plan.instructions, "finish": plan.finish}
 
@@ -399,6 +402,16 @@ def create_app(bot: Bot, bot_name: str = "Bartendro") -> FastAPI:
     @app.post("/api/check-levels", status_code=202)
     def api_check_levels():
         bot.check_levels(background=True)
+        return {"ok": True}
+
+    @app.post("/api/continue")
+    def api_continue():
+        bot.continue_pour()
+        return {"ok": True}
+
+    @app.post("/api/cancel-pour")
+    def api_cancel_pour():
+        bot.continue_pour(cancel=True)
         return {"ok": True}
 
     @app.post("/api/reset")

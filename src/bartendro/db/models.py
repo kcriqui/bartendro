@@ -40,9 +40,9 @@ def utcnow() -> datetime:
 
 
 class Kind(str, enum.Enum):
-    """What the strength / tartness buttons adjust (old booze.type 0-3)."""
+    """What the tartness button adjusts (old booze.type 2-3). Strength goes by
+    Ingredient.alcoholic (old type 1 "alcohol" was folded into that in migration 0005)."""
     OTHER = "other"
-    ALCOHOL = "alcohol"  # scaled by "strength"
     TART = "tart"        # scaled up by "tartness"
     SWEET = "sweet"      # scaled down by "tartness"
 
@@ -60,8 +60,9 @@ class Ingredient(Base):
     ("Tito's" or "Reposado Tequila", generic_id -> its generic). A recipe asking for a generic
     ingredient can use any of its specific ones (old booze groups); a recipe asking for a
     specific one needs exactly that (a Reposado drink is never made with plain Tequila).
-    `manual`: never pumped (bitters, mint, half and half). `on_hand`: the guest can add it by
-    hand right now - the by-hand counterpart of being on a dispenser."""
+    `alcoholic`: booze (scaled by the strength button) vs. mixer. `manual`: can never go on a
+    pump (ice, mint, lime wedges). `on_hand`: the guest can add it by hand right now. Bitters,
+    absinthe or half and half can be either: pumped if on a dispenser, else added by hand."""
     __tablename__ = "ingredient"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -70,7 +71,8 @@ class Ingredient(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     abv: Mapped[float] = mapped_column(Float, default=0.0)
     kind: Mapped[Kind] = mapped_column(_enum(Kind), default=Kind.OTHER)
-    manual: Mapped[bool] = mapped_column(Boolean, default=False)  # added by hand, never pumped
+    alcoholic: Mapped[bool] = mapped_column(Boolean, default=False)  # booze, not a mixer
+    manual: Mapped[bool] = mapped_column(Boolean, default=False)  # can never be pumped
     on_hand: Mapped[bool] = mapped_column(Boolean, default=False)  # available to add by hand
     generic_id: Mapped[int | None] = mapped_column(ForeignKey("ingredient.id"))
     generic_order: Mapped[int] = mapped_column(Integer, default=0)  # sort order within its generic
@@ -97,6 +99,7 @@ class Drink(Base):
     finish: Mapped[str] = mapped_column(Text, default="")  # what the guest does after the pour, e.g. "Shake with ice and strain."
     glass: Mapped[str] = mapped_column(String(50), default="")
     source: Mapped[str] = mapped_column(String(50), default="")  # "legacy" (old db), "classics" (bundled), ""
+    category: Mapped[str] = mapped_column(String(50), default="")  # menu section override; "" = automatic
 
     items: Mapped[list[RecipeItem]] = relationship(back_populates="drink", cascade="all, delete-orphan",
                                                    order_by="RecipeItem.position")
@@ -110,10 +113,11 @@ class RecipeItem(Base):
     """One ingredient of a drink: its share of the mix (`parts`; recipes from the bundled file
     use ml as parts and keep the amount as written in `amount` + `unit`, e.g. 2 oz).
 
-    Added by hand (`by_hand`) instead of pumped when the ingredient is manual (half and half:
-    a share of the mix, scaled with the glass) or the amount is counted (parts None: "2 dash",
-    "6 leaf" - not part of the mix). `step` says when: "before" the pour (absinthe rinse,
-    muddled mint) or "after" (bitters, cream)."""
+    Counted amounts (parts None: "2 dash", "6 leaf") aren't part of the mix. Whether a line is
+    pumped or added by hand is decided when the drink is made (menu.resolve_line): pumped if
+    its ingredient is on a dispenser and the amount can be pumped (`pumpable`), else by hand if
+    on hand. `step` says when a by-hand line goes in: "before" the pour (absinthe rinse,
+    muddled mint, ice) or "after" (bitters, cream)."""
     __tablename__ = "recipe_item"
     __table_args__ = (UniqueConstraint("drink_id", "ingredient_id"),
                       CheckConstraint("parts IS NULL OR parts > 0", name="parts_positive"))
@@ -131,9 +135,22 @@ class RecipeItem(Base):
     ingredient: Mapped[Ingredient] = relationship()
 
     @property
+    def pumpable(self) -> bool:
+        """Could the pumps pour this line? Not for never-pumped ingredients (ice, mint) or
+        units without a volume (leaf, wedge, fill)."""
+        return not self.ingredient.manual and (self.parts is not None or self.unit in PUMP_ML)
+
+    @property
     def by_hand(self) -> bool:
-        """Added by the guest (a dash of bitters, half and half), not by the pumps."""
-        return self.parts is None or self.ingredient.manual
+        """Always added by the guest, whatever is on the pumps."""
+        return not self.pumpable
+
+    def pump_ml(self, mix_ml: float | None = None) -> float:
+        """ml to pump: its share of the mix (`mix_ml`, from scale_recipe) or a counted amount
+        converted with PUMP_ML (2 dash = 1.8 ml; not scaled with the glass)."""
+        if self.parts is not None:
+            return mix_ml or 0.0
+        return (self.amount or 0) * PUMP_ML[self.unit]
 
     @property
     def hand_text(self) -> str:
@@ -147,6 +164,8 @@ HAND_UNITS = {"dash": "dashes", "drop": "drops", "barspoon": "barspoons", "pinch
               "wedge": "wedges", "slice": "slices", "cube": "cubes", "piece": "pieces",
               "fill": "fill"}  # "fill" (ice): "fill the glass with"
 STEPS = ("before", "after")
+# ml per counted unit when the ingredient is on a pump (bitters / absinthe on a dispenser)
+PUMP_ML = {"dash": 0.9, "drop": 0.05, "barspoon": 5.0, "tsp": 5.0, "splash": 7.0}
 
 
 def amount_text(amount: float | None, unit: str) -> str:

@@ -29,8 +29,10 @@ const Bartendro = (() => {
     return text ? `${text} ${name}` : `${amount(ml)} ${name}`;
   }
 
+  let onOverlayClose = null;
   function overlay({ title, text = "", manual = [], spinner = false, bad = false, reset = false, close = false,
-                     autoHide = 0, go = null }) {
+                     autoHide = 0, go = null, goLabel = "Pour", onClose = null }) {
+    onOverlayClose = onClose;
     const o = $("#overlay");
     $("#overlay-title").textContent = title;
     $("#overlay-text").textContent = text;
@@ -48,7 +50,8 @@ const Bartendro = (() => {
     $("#overlay-close").textContent = go ? "Cancel" : "OK";
     const goBtn = $("#overlay-go");
     goBtn.hidden = !go;
-    goBtn.onclick = go ? () => { hideOverlay(); go(); } : null;
+    goBtn.textContent = goLabel;
+    goBtn.onclick = go ? () => { onOverlayClose = null; hideOverlay(); go(); } : null;
     o.classList.toggle("bad", bad);
     o.hidden = false;
     clearTimeout(overlayTimer);
@@ -91,6 +94,13 @@ const Bartendro = (() => {
   function onEvent(ev) {
     if (ev.type === "status") showStatus(ev);
     else if (ev.type === "pouring") overlay({ title: `Pouring ${ev.name}`, text: amount(ev.ml), spinner: true });
+    else if (ev.type === "stage_done") {  // e.g. absinthe poured: rinse the glass, then continue
+      overlay({ title: "Your turn", text: ev.instructions || "", manual: ev.before || [], close: true,
+                go: () => post("/api/continue").catch((err) => toast(err.message)),
+                goLabel: "Continue", onClose: () => post("/api/cancel-pour").catch(() => {}) });
+    }
+    else if (ev.type === "cancelled") overlay({ title: "Cancelled", text: `${ev.name} was not finished.`,
+                                               close: true, autoHide: 4000 });
     else if (ev.type === "done") {
       const manual = ev.after || [];
       const todo = manual.length || ev.finish;
@@ -133,7 +143,12 @@ const Bartendro = (() => {
     try { await post(box.dataset.toggle); } catch (err) { box.checked = !box.checked; toast(err.message); }
   });
 
-  $("#overlay-close").addEventListener("click", hideOverlay);
+  $("#overlay-close").addEventListener("click", () => {
+    const cb = onOverlayClose;
+    onOverlayClose = null;
+    hideOverlay();
+    if (cb) cb();
+  });
   $("#overlay-reset").addEventListener("click", async () => {
     try { await post("/api/reset"); hideOverlay(); } catch (err) { toast(err.message); }
   });
@@ -189,7 +204,7 @@ const Bartendro = (() => {
     }
     // Drinks with a before-pour step (absinthe rinse, muddled mint) get a checklist first.
     function confirmThen(ml) {
-      if (plan && plan.before.length) {
+      if (plan && plan.before.length && !plan.pre_pumps.length) {  // else: asked between the stages
         overlay({ title: "First, by hand", text: plan.instructions, manual: plan.before, close: true,
                   go: () => make(ml) });
       } else {
