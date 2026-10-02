@@ -98,3 +98,11 @@ Parties in the bot database (both inactive): Halloween (from the showcase) and *
 (Kevin's party at the end of July at Yurtville, in the redwoods near Santa Cruz): US Forest Service
 colours (green #1f4d2b, brown #5b3a1e, yellow), logo `deploy/uploads/yurtville.svg` (banjo + lasers +
 redwoods, drawn for this project; also in build/uploads), no drink list yet = every drink.
+
+## Party robot artwork (2026-10-02)
+
+Kevin's reference picture of the happy party robot: [images/happy-robot.avif](images/happy-robot.avif)
+(the same drawing as the Kickstarter page's robot). The robot on the menus is traced from the repo's
+own copy, `ui/content/static/images/partyrobot.png`, by `scripts/trace_robot.py` - a hand-drawn
+copy wasn't close enough. It sits big behind the menus (40% opacity, outlines lighter than the
+colours); party colours repaint it: tray <- frame colour, drink and dots <- button colour.
