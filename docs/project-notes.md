@@ -126,3 +126,26 @@ font pixel on the 16-row board (`static/led-font.js`). Kevin picked it from a si
 8x13, 9x15 (regular + bold) and Helvetica 12 (scratch: build/fonts/compare.html, bdf2json.py). Tried
 before and rejected: canvas text (strokes too thick), the Adafruit GFX 5x7 (boring), 5x7 doubled with
 Scale2x (too smoothed). Pixel Operator (CC0, 16 px) wasn't reachable to try.
+
+## Pi model and performance (2026-10-02)
+
+Measured on Kevin's PC (Ryzen 9 7945HX), after the speed-up in 6dc26c6: guest pages ~6 ms, ~100 MB
+for the Python app; pages are gzipped to ~10-12 KB. Estimates below are rough (Python on a Pi 4 is
+maybe 8-10x slower than that PC, a Pi 3B+ another 2-3x) - measure on the real boards.
+
+- **Pi 4, 2 GB** - recommended for the 15-pump bots with the Waveshare 10" kiosk: the Chromium
+  kiosk takes 300-500 MB; menu pages maybe ~50-60 ms. 1 GB works if the kiosk is the only thing
+  running (minimal desktop or bare kiosk, zram instead of swap on the SD card).
+- **Pi 3B+, 1 GB** - fine as a server only (phones over the hotspot): maybe ~100-150 ms per page,
+  ~100 MB app + hotspot. Good for the 3-pump bots (margaritabot...). Marginal for the kiosk:
+  Chromium plus the weak GPU at 1280x800 - expect ~1 s page changes and jank, most likely in the
+  animated LED sign and the faded robot background layered under it. If a Pi 3B+ must drive the
+  screen, milestone 5 could add a "light kiosk" mode: Cog/WPE WebKit or a pared-down Chromium,
+  the LED sign at a lower frame rate, no robot background on that screen.
+- Pumping speed is set by the router/I2C, not the Pi.
+- SD card (both): power cuts are the risk, not wear - good A1/A2 card, SQLite in WAL mode, logs
+  in RAM, no swap on the card, ideally a read-only root with the database on a small data
+  partition, and a database backup at start-up (milestone 5 install script).
+- To check on real hardware: page timings (small benchmark script), Chromium memory over an
+  evening, steady frame rate of the LED sign.
+
