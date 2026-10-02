@@ -2,7 +2,9 @@
 
 A fully working copy of the web app with **simulated pumps**, reachable from anywhere through
 Tailscale Funnel. Visitors only need a browser; Tailscale runs on the NAS. The demo starts from
-the showcase setup (bundled drinks, 15 bottles, a demo party) and resets on every restart.
+a copy of the bot database committed as `deploy/demo-bot.db` and resets on every restart.
+To update the demo's drinks and bottles: copy `build/bartendro.db` over `deploy/demo-bot.db`, push,
+redeploy. (`bartendro-web --showcase` instead starts from the bundled drinks + 15 demo bottles.)
 There's no login: anyone with the link can use everything, admin included; logo uploads are off.
 
 ## 1. Run the container on TrueNAS

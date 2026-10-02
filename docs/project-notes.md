@@ -53,7 +53,11 @@ Fully working copy with simulated pumps for colleagues outside the LAN ([hosting
 TrueNAS custom app **`bartendro-demo`** (Install via YAML with `deploy/truenas-demo.yaml`, entered
 as one-line JSON because the TrueNAS editor auto-indents), NAS port **8077**, made public by Kevin
 with `tailscale funnel --bg 8077` in the TrueNAS tailscale app's shell. One shared bot, no
-password (Kevin's choice). Restart the app to reset it to the showcase.
+password (Kevin's choice). Restart the app to reset it.
+Since 2026-10-02 it runs a copy of the bot database (`deploy/demo-bot.db`, committed - Kevin chose
+that over mounting build/bartendro.db from the NAS, so his recipes are public on GitHub) instead of
+the showcase. Refresh: copy build/bartendro.db over it, push, redeploy.
+Public URL: **https://truenas-scale.tail4c32e5.ts.net** (LAN: http://truenas:8077).
 - New code reaches it only when the app is edited/redeployed in TrueNAS (`pull_policy: build`).
 - The first build failed with a transient "SSL connection timeout" fetching from GitHub; a retry
   worked. If it recurs, publish a prebuilt image (GHCR) instead of building on the NAS.

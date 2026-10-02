@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import shutil
 import sys
+from pathlib import Path
 
 from .. import config as config_mod
 from ..bot import Bot
@@ -34,6 +36,9 @@ def main(argv=None) -> int:
     ap.add_argument("--showcase", action="store_true",
                     help="start from a fresh showcase database (bundled drinks, 15 bottles, a demo party) "
                          "at --db, replacing what's there - for demo copies")
+    ap.add_argument("--start-from", metavar="FILE",
+                    help="start from a fresh copy of FILE (a bot database) at --db, replacing what's "
+                         "there - for demo copies of a real bot")
     ap.add_argument("--banner", default="", help="a line shown on every page, e.g. 'Demo: simulated pumps'")
     ap.add_argument("--no-uploads", action="store_true", help="switch off party logo uploads")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -49,9 +54,18 @@ def main(argv=None) -> int:
     hw = cfg.hardware
     simulate = args.sim if args.sim is not None else hw.simulate
     db_path = args.db or cfg.database_path()
+    if args.showcase and args.start_from:
+        print("error: use --showcase or --start-from, not both", file=sys.stderr)
+        return 2
     if args.showcase:
         from .. import showcase
         sessions = showcase.build(db_path)
+    elif args.start_from:
+        if not Path(args.start_from).is_file():
+            print(f"error: {args.start_from} does not exist", file=sys.stderr)
+            return 2
+        shutil.copyfile(args.start_from, db_path)
+        sessions = open_db(db_path)  # brings the copy's schema up to date
     else:
         sessions = open_db(db_path)
     log.info("%s: database %s", cfg.name, db_path)

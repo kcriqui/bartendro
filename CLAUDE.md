@@ -47,8 +47,10 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    A drink with several spirits is in each spirit's section (Long Island: Vodka, Tequila, Rum,
    Gin); spirits are recognised by name (`menu.SPIRIT_WORDS`), not ABV - old dbs have wrong ABVs.
    Hosted demo for colleagues: TrueNAS app `bartendro-demo` (port 8077, simulated pumps, resets
-   on restart) public via Tailscale Funnel - docs/hosting.md + docs/project-notes.md. It only
-   gets new code when redeployed in TrueNAS. The static GitHub Pages demo was removed (don't
+   on restart) public via Tailscale Funnel at https://truenas-scale.tail4c32e5.ts.net -
+   docs/hosting.md + docs/project-notes.md. It runs a copy of the bot database committed as
+   `deploy/demo-bot.db` (Kevin chose public over a NAS mount); refresh it from build/bartendro.db.
+   It only gets new code (or a new demo-bot.db) when redeployed in TrueNAS. The static GitHub Pages demo was removed (don't
    bring it back unasked).
 4. **Recipe database** - done 2026-10-01: `src/bartendro/data/classics.toml`, 62 drinks (7 non-alcoholic)
    written for this project (amounts are facts from classic/IBA specs; no copied text - the
@@ -107,8 +109,8 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 - `db/recipes.py` - loads classics.toml (or a file like it): `bartendro-db load-recipes`,
   Admin > Drinks button. `db/menu.py` also has one_bottle_away() and suggest_bottles().
 - `web/theme.py` - party colours -> CSS variable overrides; logos in `<db dir>/uploads`.
-- `showcase.py` - demo setup (bundled drinks, 15 bottles, demo party); `bartendro-web --showcase
-  --banner ... --no-uploads` is what the Dockerfile / `deploy/truenas-demo.yaml` run.
+- `showcase.py` - demo setup (bundled drinks, 15 bottles, demo party) for `bartendro-web --showcase`.
+  The Dockerfile runs `--start-from /app/demo-bot.db` (fresh copy of deploy/demo-bot.db each start).
 - `scripts/render_old_ui.py` - renders the original Python 2 templates to build/old-ui.
 - `docs/project-notes.md` - decisions and findings (touchscreen, mini-router firmware, hosting,
   bot database); `docs/plans/` - approved plans.
