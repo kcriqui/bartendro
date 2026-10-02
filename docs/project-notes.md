@@ -72,4 +72,10 @@ Fuzzy Navel, Amaretto Sour, Hairy Navel, White Russian, Screwdriver; Tequila Sun
 except Manhattan (web version). "Empty" bottles became empty pumps (#3, #15); "Tequia, Anejo"
 renamed Anejo Tequila; Patron Citronge and Pierre Ferrand dry curacao are brands of Triple Sec,
 the Bourbon variants brands of Whiskey, "Lime Juice, Persian" a brand of Lime Juice.
-Settings are the defaults (Lunarville used drink_size 100, taster 20).
+Settings are the defaults except drink_size = 100 ml (as at Lunarville; its taster was 20).
+Old default database (`ui/bartendro.db.default`): 59 of its 83 drinks are identical in Lunarville and
+9 more are there renamed / reworked (Lunarville renamed drinks "Margarita, SND" style and buries
+retired ones with a "zzz" prefix - so compare by description and recipe, not just name). The 6
+it really lacked were added from the default db (`build/add_default_missing.py`): Top Shelf
+Margarita, Authentic Margarita, Dirty Sanchez, Baileys only!, White Catalan, Barcelona Mudslide
+(+ Ratafia). 216 drinks.
