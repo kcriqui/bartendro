@@ -85,6 +85,8 @@ h3 { font-size: 16pt; margin: 1.2em 0 .5em; }
 .sections .count { font-size: 11pt; opacity: .85; }
 .back { margin-bottom: 8px; }
 .welcome { font-size: 14pt; color: var(--heading); margin: 0 0 6px; }
+.party-art { display: block; width: 100%; max-width: 640px; max-height: 200px; object-fit: contain;
+             margin: 0 auto 10px; }
 h4 { color: var(--heading); font-weight: normal; margin: 14px 0 4px; }
 .sick { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; }
 .sick img { height: 180px; }

@@ -11,11 +11,11 @@ from sqlalchemy.orm import Session, sessionmaker
 from .db import open_db, recipes
 from .db.models import Dispenser, Drink, Ingredient, Party, PartyDrink
 
-BOTTLES = ["Vodka", "Tequila", "White Rum", "Gin", "Rye Whiskey", "Triple Sec", "Coffee Liqueur",
-           "Campari", "Sweet Vermouth", "Lime Juice", "Lemon Juice", "Simple Syrup", "Orange Juice",
+BOTTLES = ["Vodka", "Tequila", "Rum, White", "Gin", "Whiskey, Rye", "Triple Sec", "Coffee Liqueur",
+           "Campari", "Vermouth, Sweet", "Lime Juice", "Lemon Juice", "Simple Syrup", "Orange Juice",
            "Cranberry Juice", "Ginger Beer"]
-ON_HAND = ["Ice", "Angostura Bitters", "Peychaud's Bitters", "Absinthe", "Half and Half", "Mint",
-           "Lime", "Sugar", "Crushed Ice", "Cola", "Tonic Water", "Soda Water"]
+ON_HAND = ["Ice", "Bitters, Angostura", "Bitters, Peychaud's", "Absinthe", "Half and Half", "Mint",
+           "Lime", "Sugar", "Ice, Crushed", "Cola", "Tonic Water", "Soda Water"]
 PARTY_DRINKS = ["Margarita", "Moscow Mule", "Cosmopolitan", "Negroni", "Screwdriver", "Cape Cod",
                 "Long Island Iced Tea", "Sazerac", "Mojito", "Shirley Temple"]
 

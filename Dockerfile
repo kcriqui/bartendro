@@ -8,6 +8,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 COPY deploy/demo-bot.db ./
+COPY deploy/uploads ./uploads
 RUN pip install . && useradd --system --home /data bartendro && mkdir -p /data && chown bartendro /data
 USER bartendro
 

@@ -82,4 +82,19 @@ Old default database (`ui/bartendro.db.default`): 59 of its 83 drinks are identi
 retired ones with a "zzz" prefix - so compare by description and recipe, not just name). The 6
 it really lacked were added from the default db (`build/add_default_missing.py`): Top Shelf
 Margarita, Authentic Margarita, Dirty Sanchez, Baileys only!, White Catalan, Barcelona Mudslide
-(+ Ratafia). 216 drinks.
+(+ Ratafia). 216 drinks (200 after the cleanup below).
+Renamed to Kevin's "Tequila, Anejo" style (`build/rename_and_parties.py`, backup
+`build/bartendro.before-rename.db`); merged duplicates that showed up: Reposado Tequila ->
+Tequila, Reposado, Rum - Dark -> Rum, Dark, Bitters - Angostura -> Bitters, Angostura. Left as is:
+juices/syrups/purees ("Lime Juice, Persian" style already), liqueurs, Kevin's z/zzz names ("z(na) " was removed: the 11 drinks are all in the Non-alcoholic
+section now). Deleted (Kevin): the 8 "Z Shot of ..." drinks (the Shots page does that) and 8
+retired zzz drinks (4 identical to live ones, "zzz delete me", the old Margarita, Lemon /
+Pomegranate and Manhattan, Jack's). The last two lost their prefix: "Cosmopolitan, Count Drac's"
+(still switched off) and "Cucumber Gin & Pim's" (on). 200 drinks, and
+the typos "Margarita, Repasado", "Margarita, Pinapple", "Daquari, Santa Ana" plus the near-duplicates
+Corpse Reviver #2 / No. 2 and Rum, Light / Rum, White (not asked).
+
+Parties in the bot database (both inactive): Halloween (from the showcase) and **Yurtville Weekend**
+(Kevin's party at the end of July at Yurtville, in the redwoods near Santa Cruz): US Forest Service
+colours (green #1f4d2b, brown #5b3a1e, yellow), logo `deploy/uploads/yurtville.svg` (banjo + lasers +
+redwoods, drawn for this project; also in build/uploads), no drink list yet = every drink.

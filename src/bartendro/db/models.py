@@ -57,7 +57,7 @@ class Level(str, enum.Enum):
 
 class Ingredient(Base):
     """Anything that goes in a drink: a generic ingredient ("Vodka") or a specific one
-    ("Tito's" or "Reposado Tequila", generic_id -> its generic). A recipe asking for a generic
+    ("Tito's" or "Tequila, Reposado", generic_id -> its generic). A recipe asking for a generic
     ingredient can use any of its specific ones (old booze groups); a recipe asking for a
     specific one needs exactly that (a Reposado drink is never made with plain Tequila).
     `alcoholic`: booze (scaled by the strength button) vs. mixer. `manual`: can never go on a

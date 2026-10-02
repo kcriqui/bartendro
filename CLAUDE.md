@@ -31,7 +31,7 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 2. **Database** - done 2026-10-01: SQLAlchemy 2 + Alembic on SQLite, importer for old
    `bartendro.db` files (`--no-logs --no-settings` for recipes + bottles only), per-bot TOML
    config, `bartendro-db` CLI. **The bot database is `build/bartendro.db`** (2026-10-02): Lunarville's
-   recipes + bottles + the bundled drinks + 6 from the old default db, 216 drinks, drink_size 100.
+   recipes + bottles + the bundled drinks + 6 from the old default db, 200 drinks after cleanup, drink_size 100.
    How it was merged and what Kevin chose: docs/project-notes.md "Bot database". Old dbs rename
    drinks ("Margarita, SND", "zzz ..." = retired), so match on description/recipe, not just name.
 3. **Web app** - first version done 2026-10-01, tested with the simulator only: FastAPI +
@@ -69,7 +69,9 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    - What's available by hand is tracked like the pumps: `Ingredient.on_hand` (Admin >
      Dispensers > On hand). Drinks only show when pumped bottles are loaded AND by-hand items
      are on hand.
-   - Specific spirits stay specific: a recipe asking for Reposado Tequila needs reposado
+   - Names (Kevin): base first, kind after a comma - "Tequila, Anejo", "Whiskey, Rye",
+     "Margarita, Tommy's" - so variants sort together. Bundled files keep old names as aliases.
+   - Specific spirits stay specific: a recipe asking for Tequila, Reposado needs reposado
      (plain Tequila won't do); a reposado bottle can make generic-Tequila drinks.
    Loader matches existing ingredients by name/alias, links brands (Kahlua -> Coffee Liqueur)
    and `generic` children; classic drinks pour their recipe total (size_ml). "One step away"

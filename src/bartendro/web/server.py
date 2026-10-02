@@ -37,8 +37,8 @@ def main(argv=None) -> int:
                     help="start from a fresh showcase database (bundled drinks, 15 bottles, a demo party) "
                          "at --db, replacing what's there - for demo copies")
     ap.add_argument("--start-from", metavar="FILE",
-                    help="start from a fresh copy of FILE (a bot database) at --db, replacing what's "
-                         "there - for demo copies of a real bot")
+                    help="start from a fresh copy of FILE (a bot database, plus the uploads folder next "
+                         "to it: party logos) at --db, replacing what's there - for demo copies of a real bot")
     ap.add_argument("--banner", default="", help="a line shown on every page, e.g. 'Demo: simulated pumps'")
     ap.add_argument("--no-uploads", action="store_true", help="switch off party logo uploads")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -65,6 +65,9 @@ def main(argv=None) -> int:
             print(f"error: {args.start_from} does not exist", file=sys.stderr)
             return 2
         shutil.copyfile(args.start_from, db_path)
+        uploads = Path(args.start_from).resolve().parent / "uploads"
+        if uploads.is_dir():
+            shutil.copytree(uploads, Path(db_path).resolve().parent / "uploads", dirs_exist_ok=True)
         sessions = open_db(db_path)  # brings the copy's schema up to date
     else:
         sessions = open_db(db_path)

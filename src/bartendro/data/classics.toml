@@ -6,7 +6,7 @@
 #     says what to do after the pour.
 # By-hand lines are never pumped; the guest gets a checklist:
 #   - counted amounts: units dash, drop, barspoon, pinch, splash, tsp, leaf, sprig, wedge,
-#     slice, cube, piece ([2, "dash", "Angostura Bitters"]); "fill" for ice
+#     slice, cube, piece ([2, "dash", "Bitters, Angostura"]); "fill" for ice
 #     ([1, "fill", "Ice", "before"] = "fill the glass with ice" before the pour)
 #   - measured amounts of ingredients that aren't on a pump ([30, "ml", "Half and Half"]),
 #     scaled with the glass
@@ -21,13 +21,16 @@
 #            database, e.g. names from an old bartendro.db), so nothing is duplicated.
 #   brands:  specific bottles that can stand in for it; an existing ingredient with one of
 #            these names is linked to it (Kahlua -> Coffee Liqueur) unless it already has a link.
-#   generic: this is a specific kind of another ingredient (Reposado Tequila -> Tequila): it can
+#   generic: this is a specific kind of another ingredient (Tequila, Reposado -> Tequila): it can
 #            make drinks that ask for the generic one, but not the other way round.
 #   manual:  can never go on a pump (ice, mint, lime wedges). Bitters, absinthe or half and
 #            half may be on a pump or added by hand - whichever is available when pouring.
 #   alcoholic: defaults to abv > 0 (booze vs mixer: the strength button scales booze).
 #   on_hand: starts out ticked as on hand when added (ice); otherwise tick it in Admin.
+# Names: the base first, the kind after a comma ("Tequila, Anejo", "Margarita, Tommy's"), so
+# variants sort next to each other (Kevin's convention, as in his old bot databases).
 # [[drink]]: ingredients = [[amount, unit, ingredient], ...]; pumped units ml, cl or oz.
+#   aliases: other names for the same drink, matched like ingredient aliases.
 #   instructions: anything else before the pour ("Pour into a shaker.")
 #   finish: what the guest does after the pour
 
@@ -41,17 +44,17 @@ name = "Rum"
 abv = 40
 
 [[ingredient]]
-name = "White Rum"
+name = "Rum, White"
 abv = 40
 generic = "Rum"
-aliases = ["Rum, Light", "Light Rum", "Silver Rum"]
+aliases = ["White Rum", "Rum, Light", "Light Rum", "Silver Rum"]
 brands = ["Bacardi", "Bacardi Superior"]
 
 [[ingredient]]
-name = "Dark Rum"
+name = "Rum, Dark"
 abv = 40
 generic = "Rum"
-aliases = ["Rum, Dark"]
+aliases = ["Dark Rum"]
 brands = ["Gosling's Black Seal", "Myers's"]
 
 [[ingredient]]
@@ -64,16 +67,16 @@ abv = 40
 brands = ["Tequila, Silver", "Tequila, Gran Centenario", "Blanco Tequila", "Silver Tequila"]
 
 [[ingredient]]
-name = "Reposado Tequila"
+name = "Tequila, Reposado"
 abv = 40
 generic = "Tequila"
-aliases = ["Tequila Reposado"]
+aliases = ["Reposado Tequila", "Tequila Reposado"]
 
 [[ingredient]]
-name = "Anejo Tequila"
+name = "Tequila, Anejo"
 abv = 40
 generic = "Tequila"
-aliases = ["Añejo Tequila", "Tequila Anejo", "Tequila Añejo"]
+aliases = ["Anejo Tequila", "Añejo Tequila", "Tequila Anejo", "Tequila Añejo"]
 
 [[ingredient]]
 name = "Cachaca"
@@ -87,16 +90,16 @@ aliases = ["Whisky"]
 brands = ["Bourbon", "Jack Daniel's", "Jameson"]
 
 [[ingredient]]
-name = "Rye Whiskey"
+name = "Whiskey, Rye"
 abv = 45
 generic = "Whiskey"
-aliases = ["Rye"]
+aliases = ["Rye Whiskey", "Rye"]
 
 [[ingredient]]
-name = "Scotch Whisky"
+name = "Whiskey, Scotch"
 abv = 40
 generic = "Whiskey"
-aliases = ["Scotch"]
+aliases = ["Scotch Whisky", "Scotch"]
 
 [[ingredient]]
 name = "Brandy"
@@ -121,7 +124,8 @@ abv = 24
 brands = ["Disaronno"]
 
 [[ingredient]]
-name = "Peach Schnapps"
+name = "Schnapps, Peach"
+aliases = ["Peach Schnapps"]
 abv = 20
 
 [[ingredient]]
@@ -133,14 +137,14 @@ name = "Aperol"
 abv = 11
 
 [[ingredient]]
-name = "Sweet Vermouth"
+name = "Vermouth, Sweet"
 abv = 16
-aliases = ["Vermouth, Sweet", "Red Vermouth", "Rosso Vermouth"]
+aliases = ["Sweet Vermouth", "Red Vermouth", "Rosso Vermouth"]
 
 [[ingredient]]
-name = "Dry Vermouth"
+name = "Vermouth, Dry"
 abv = 18
-aliases = ["Vermouth, Dry", "French Vermouth"]
+aliases = ["Dry Vermouth", "French Vermouth"]
 
 [[ingredient]]
 name = "Lillet Blanc"
@@ -157,14 +161,15 @@ abv = 15
 aliases = ["Crème de Cassis", "Cassis"]
 
 [[ingredient]]
-name = "Sparkling Wine"
+name = "Wine, Sparkling"
+aliases = ["Sparkling Wine"]
 abv = 11
 brands = ["Prosecco", "Champagne", "Cava"]
 
 [[ingredient]]
-name = "Dry White Wine"
+name = "Wine, Dry White"
 abv = 12
-aliases = ["White Wine"]
+aliases = ["Dry White Wine", "White Wine"]
 
 # ------------------------------------------------------------------ juices, syrups
 [[ingredient]]
@@ -250,16 +255,16 @@ brands = ["Squirt", "Jarritos Toronja"]
 
 # ------------------------------------------------------------------ by hand
 [[ingredient]]
-name = "Angostura Bitters"
+name = "Bitters, Angostura"
 kind = "other"
 abv = 45
-aliases = ["Bitters, Angostura", "Angostura", "Aromatic Bitters"]
+aliases = ["Angostura Bitters", "Angostura", "Aromatic Bitters"]
 
 [[ingredient]]
-name = "Peychaud's Bitters"
+name = "Bitters, Peychaud's"
 kind = "other"
 abv = 35
-aliases = ["Peychauds Bitters", "Peychaud's"]
+aliases = ["Peychaud's Bitters", "Peychauds Bitters", "Peychaud's"]
 
 [[ingredient]]
 name = "Absinthe"
@@ -287,7 +292,8 @@ on_hand = true
 aliases = ["Ice Cubes"]
 
 [[ingredient]]
-name = "Crushed Ice"
+name = "Ice, Crushed"
+aliases = ["Crushed Ice"]
 kind = "other"
 manual = true
 
@@ -364,20 +370,20 @@ name = "Sex on the Beach"
 glass = "highball"
 popular = true
 description = "Vodka, peach schnapps, orange and cranberry. Fruity party favourite."
-ingredients = [[1, "fill", "Ice", "before"], [40, "ml", "Vodka"], [20, "ml", "Peach Schnapps"], [40, "ml", "Orange Juice"],
+ingredients = [[1, "fill", "Ice", "before"], [40, "ml", "Vodka"], [20, "ml", "Schnapps, Peach"], [40, "ml", "Orange Juice"],
                [40, "ml", "Cranberry Juice"]]
 
 [[drink]]
 name = "Fuzzy Navel"
 glass = "highball"
 description = "Peach schnapps and orange juice."
-ingredients = [[1, "fill", "Ice", "before"], [45, "ml", "Peach Schnapps"], [135, "ml", "Orange Juice"]]
+ingredients = [[1, "fill", "Ice", "before"], [45, "ml", "Schnapps, Peach"], [135, "ml", "Orange Juice"]]
 
 [[drink]]
 name = "Hairy Navel"
 glass = "highball"
 description = "A Fuzzy Navel with vodka in it."
-ingredients = [[1, "fill", "Ice", "before"], [30, "ml", "Vodka"], [30, "ml", "Peach Schnapps"], [120, "ml", "Orange Juice"]]
+ingredients = [[1, "fill", "Ice", "before"], [30, "ml", "Vodka"], [30, "ml", "Schnapps, Peach"], [120, "ml", "Orange Juice"]]
 
 [[drink]]
 name = "Vodka Tonic"
@@ -419,20 +425,20 @@ glass = "highball"
 popular = true
 description = "Rum and cola with a squeeze of lime."
 finish = "A lime wedge if you have one."
-ingredients = [[1, "fill", "Ice", "before"], [50, "ml", "White Rum"], [120, "ml", "Cola"], [10, "ml", "Lime Juice"]]
+ingredients = [[1, "fill", "Ice", "before"], [50, "ml", "Rum, White"], [120, "ml", "Cola"], [10, "ml", "Lime Juice"]]
 
 [[drink]]
 name = "Rum and Coke"
 glass = "highball"
 description = "Rum and cola, no lime."
-ingredients = [[1, "fill", "Ice", "before"], [50, "ml", "White Rum"], [150, "ml", "Cola"]]
+ingredients = [[1, "fill", "Ice", "before"], [50, "ml", "Rum, White"], [150, "ml", "Cola"]]
 
 [[drink]]
 name = "Dark 'n' Stormy"
 glass = "highball"
 description = "Dark rum over ginger beer."
 finish = "A lime wedge if you have one."
-ingredients = [[1, "fill", "Ice", "before"], [60, "ml", "Dark Rum"], [100, "ml", "Ginger Beer"]]
+ingredients = [[1, "fill", "Ice", "before"], [60, "ml", "Rum, Dark"], [100, "ml", "Ginger Beer"]]
 
 [[drink]]
 name = "Gin and Tonic"
@@ -454,13 +460,13 @@ name = "Negroni"
 glass = "old fashioned"
 description = "Gin, Campari and sweet vermouth in equal parts. Bitter and bold."
 finish = "An orange slice if you have one."
-ingredients = [[1, "fill", "Ice", "before"], [30, "ml", "Gin"], [30, "ml", "Campari"], [30, "ml", "Sweet Vermouth"]]
+ingredients = [[1, "fill", "Ice", "before"], [30, "ml", "Gin"], [30, "ml", "Campari"], [30, "ml", "Vermouth, Sweet"]]
 
 [[drink]]
 name = "Americano"
 glass = "old fashioned"
 description = "Campari and sweet vermouth with soda. Lighter than a Negroni."
-ingredients = [[1, "fill", "Ice", "before"], [30, "ml", "Campari"], [30, "ml", "Sweet Vermouth"], [30, "ml", "Soda Water"]]
+ingredients = [[1, "fill", "Ice", "before"], [30, "ml", "Campari"], [30, "ml", "Vermouth, Sweet"], [30, "ml", "Soda Water"]]
 
 [[drink]]
 name = "Campari Soda"
@@ -480,21 +486,21 @@ glass = "wine glass"
 popular = true
 description = "Aperol, sparkling wine and a splash of soda."
 finish = "An orange slice if you have one."
-ingredients = [[1, "fill", "Ice", "before"], [90, "ml", "Sparkling Wine"], [60, "ml", "Aperol"], [30, "ml", "Soda Water"]]
+ingredients = [[1, "fill", "Ice", "before"], [90, "ml", "Wine, Sparkling"], [60, "ml", "Aperol"], [30, "ml", "Soda Water"]]
 
 [[drink]]
 name = "Mimosa"
 glass = "flute"
 description = "Sparkling wine and orange juice."
 instructions = "No ice."
-ingredients = [[75, "ml", "Sparkling Wine"], [75, "ml", "Orange Juice"]]
+ingredients = [[75, "ml", "Wine, Sparkling"], [75, "ml", "Orange Juice"]]
 
 [[drink]]
 name = "Kir"
 glass = "wine glass"
 description = "Dry white wine with a little blackcurrant liqueur."
 instructions = "No ice."
-ingredients = [[90, "ml", "Dry White Wine"], [10, "ml", "Creme de Cassis"]]
+ingredients = [[90, "ml", "Wine, Dry White"], [10, "ml", "Creme de Cassis"]]
 
 [[drink]]
 name = "Tequila Sunrise"
@@ -526,13 +532,13 @@ ingredients = [[1, "fill", "Ice", "before"], [50, "ml", "Whiskey"], [150, "ml", 
 name = "Godfather"
 glass = "old fashioned"
 description = "Scotch and amaretto."
-ingredients = [[1, "fill", "Ice", "before"], [35, "ml", "Scotch Whisky"], [35, "ml", "Amaretto"]]
+ingredients = [[1, "fill", "Ice", "before"], [35, "ml", "Whiskey, Scotch"], [35, "ml", "Amaretto"]]
 
 [[drink]]
 name = "Rusty Nail"
 glass = "old fashioned"
 description = "Scotch with Drambuie's honey and herbs."
-ingredients = [[1, "fill", "Ice", "before"], [45, "ml", "Scotch Whisky"], [25, "ml", "Drambuie"]]
+ingredients = [[1, "fill", "Ice", "before"], [45, "ml", "Whiskey, Scotch"], [25, "ml", "Drambuie"]]
 
 [[drink]]
 name = "Horse's Neck"
@@ -552,7 +558,7 @@ name = "Long Island Iced Tea"
 glass = "highball"
 popular = true
 description = "Five spirits, lemon, sugar and a splash of cola. Stronger than it tastes."
-ingredients = [[1, "fill", "Ice", "before"], [15, "ml", "Vodka"], [15, "ml", "Tequila"], [15, "ml", "White Rum"], [15, "ml", "Gin"],
+ingredients = [[1, "fill", "Ice", "before"], [15, "ml", "Vodka"], [15, "ml", "Tequila"], [15, "ml", "Rum, White"], [15, "ml", "Gin"],
                [15, "ml", "Triple Sec"], [25, "ml", "Lemon Juice"], [30, "ml", "Simple Syrup"],
                [30, "ml", "Cola"]]
 
@@ -564,7 +570,7 @@ glass = "old fashioned"
 popular = true
 description = "Whiskey, a little sugar and aromatic bitters."
 finish = "Add the bitters and stir a few times. An orange peel if you have one."
-ingredients = [[1, "fill", "Ice", "before"], [45, "ml", "Whiskey"], [7.5, "ml", "Simple Syrup"], [2, "dash", "Angostura Bitters"]]
+ingredients = [[1, "fill", "Ice", "before"], [45, "ml", "Whiskey"], [7.5, "ml", "Simple Syrup"], [2, "dash", "Bitters, Angostura"]]
 
 [[drink]]
 name = "Bloody Mary"
@@ -586,7 +592,8 @@ finish = "Shake hard with ice and strain into a chilled glass (salt the rim firs
 ingredients = [[50, "ml", "Tequila"], [20, "ml", "Triple Sec"], [15, "ml", "Lime Juice"]]
 
 [[drink]]
-name = "Tommy's Margarita"
+name = "Margarita, Tommy's"
+aliases = ["Tommy's Margarita"]
 glass = "old fashioned"
 description = "Tequila, lime and agave - no orange liqueur."
 instructions = "Pour into a shaker."
@@ -600,7 +607,7 @@ popular = true
 description = "Rum, lime and sugar. The real one, not the frozen kind."
 instructions = "Pour into a shaker."
 finish = "Shake hard with ice and strain into a chilled glass."
-ingredients = [[60, "ml", "White Rum"], [20, "ml", "Lime Juice"], [10, "ml", "Simple Syrup"]]
+ingredients = [[60, "ml", "Rum, White"], [20, "ml", "Lime Juice"], [10, "ml", "Simple Syrup"]]
 
 [[drink]]
 name = "Cosmopolitan"
@@ -671,15 +678,16 @@ popular = true
 description = "Whiskey, sweet vermouth and bitters."
 instructions = "Pour into a mixing glass."
 finish = "Add the bitters, stir with ice and strain into a chilled glass. A cherry if you have one."
-ingredients = [[50, "ml", "Whiskey"], [20, "ml", "Sweet Vermouth"], [1, "dash", "Angostura Bitters"]]
+ingredients = [[50, "ml", "Whiskey"], [20, "ml", "Vermouth, Sweet"], [1, "dash", "Bitters, Angostura"]]
 
 [[drink]]
-name = "Dry Martini"
+name = "Martini, Dry"
+aliases = ["Dry Martini"]
 glass = "cocktail"
 description = "Gin with a little dry vermouth."
 instructions = "Pour into a mixing glass."
 finish = "Stir with ice and strain into a chilled glass. An olive or a lemon twist."
-ingredients = [[60, "ml", "Gin"], [10, "ml", "Dry Vermouth"]]
+ingredients = [[60, "ml", "Gin"], [10, "ml", "Vermouth, Dry"]]
 
 [[drink]]
 name = "Boulevardier"
@@ -687,7 +695,7 @@ glass = "old fashioned"
 description = "A Negroni with whiskey instead of gin."
 instructions = "Pour into a mixing glass."
 finish = "Stir with ice and strain into a chilled glass (or over a big ice cube)."
-ingredients = [[45, "ml", "Whiskey"], [30, "ml", "Campari"], [30, "ml", "Sweet Vermouth"]]
+ingredients = [[45, "ml", "Whiskey"], [30, "ml", "Campari"], [30, "ml", "Vermouth, Sweet"]]
 
 [[drink]]
 name = "Sazerac"
@@ -695,24 +703,26 @@ glass = "old fashioned"
 description = "Rye, sugar and Peychaud's bitters in an absinthe-rinsed glass, served neat. New Orleans' own."
 instructions = "Chill the glass, swirl the absinthe around it and pour out the excess, then pour into that glass. No ice."
 finish = "Add the bitters and stir. Lemon peel over the top."
-ingredients = [[1, "dash", "Absinthe", "before"], [60, "ml", "Rye Whiskey"], [7.5, "ml", "Simple Syrup"],
-               [3, "dash", "Peychaud's Bitters"]]
+ingredients = [[1, "dash", "Absinthe", "before"], [60, "ml", "Whiskey, Rye"], [7.5, "ml", "Simple Syrup"],
+               [3, "dash", "Bitters, Peychaud's"]]
 
 [[drink]]
-name = "Sazerac on the Rocks"
+name = "Sazerac, on the Rocks"
+aliases = ["Sazerac on the Rocks"]
 glass = "old fashioned"
 description = "The Sazerac over ice: rye, sugar, Peychaud's bitters and an absinthe rinse."
 instructions = "Swirl the absinthe around the glass and pour out the excess, then add the ice."
 finish = "Add the bitters and stir. Lemon peel over the top."
-ingredients = [[1, "dash", "Absinthe", "before"], [1, "fill", "Ice", "before"], [60, "ml", "Rye Whiskey"],
-               [7.5, "ml", "Simple Syrup"], [3, "dash", "Peychaud's Bitters"]]
+ingredients = [[1, "dash", "Absinthe", "before"], [1, "fill", "Ice", "before"], [60, "ml", "Whiskey, Rye"],
+               [7.5, "ml", "Simple Syrup"], [3, "dash", "Bitters, Peychaud's"]]
 
 [[drink]]
-name = "Tequila Old Fashioned"
+name = "Old Fashioned, Tequila"
+aliases = ["Tequila Old Fashioned"]
 glass = "old fashioned"
 description = "An Old Fashioned made with reposado tequila and agave."
 finish = "Add the bitters and stir a few times. An orange peel if you have one."
-ingredients = [[1, "fill", "Ice", "before"], [60, "ml", "Reposado Tequila"], [7.5, "ml", "Agave Syrup"], [2, "dash", "Angostura Bitters"]]
+ingredients = [[1, "fill", "Ice", "before"], [60, "ml", "Tequila, Reposado"], [7.5, "ml", "Agave Syrup"], [2, "dash", "Bitters, Angostura"]]
 
 # ------------------------------------------------------------------ the guest muddles first
 
@@ -723,7 +733,7 @@ popular = true
 description = "Rum, lime, sugar, mint and soda."
 instructions = "Gently muddle the mint in the glass, then add the ice."
 finish = "Stir gently. A mint sprig on top if you have one."
-ingredients = [[6, "leaf", "Mint", "before"], [1, "fill", "Ice", "before"], [45, "ml", "White Rum"], [20, "ml", "Lime Juice"],
+ingredients = [[6, "leaf", "Mint", "before"], [1, "fill", "Ice", "before"], [45, "ml", "Rum, White"], [20, "ml", "Lime Juice"],
                [15, "ml", "Simple Syrup"], [60, "ml", "Soda Water"]]
 
 [[drink]]
@@ -733,7 +743,7 @@ description = "Cachaca with muddled lime and sugar. Brazil's national cocktail."
 instructions = "Muddle the lime wedges with the sugar in the glass, then add the crushed ice."
 finish = "Stir well."
 ingredients = [[4, "wedge", "Lime", "before"], [2, "tsp", "Sugar", "before"],
-               [1, "fill", "Crushed Ice", "before"], [60, "ml", "Cachaca"]]
+               [1, "fill", "Ice, Crushed", "before"], [60, "ml", "Cachaca"]]
 
 # ------------------------------------------------------------------ non-alcoholic
 

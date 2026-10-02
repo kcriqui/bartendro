@@ -61,10 +61,10 @@ def test_sazerac(session):
     saz = drink(session, "Sazerac")
     measured = [(i.ingredient.name, i.parts) for i in saz.items if i.parts is not None]
     counted = [(i.ingredient.name, i.hand_text, i.step) for i in saz.items if i.parts is None]
-    assert measured == [("Rye Whiskey", 60), ("Simple Syrup", 7.5)]
-    assert counted == [("Absinthe", "1 dash", "before"), ("Peychaud's Bitters", "3 dashes", "after")]
+    assert measured == [("Whiskey, Rye", 60), ("Simple Syrup", 7.5)]
+    assert counted == [("Absinthe", "1 dash", "before"), ("Bitters, Peychaud's", "3 dashes", "after")]
     assert saz.size_ml == 68 and "absinthe" in saz.instructions.lower()
-    session.add_all([Dispenser(number=1, ingredient=ing(session, "Rye Whiskey")),
+    session.add_all([Dispenser(number=1, ingredient=ing(session, "Whiskey, Rye")),
                      Dispenser(number=2, ingredient=ing(session, "Simple Syrup"))])
     session.commit()
     # the bitters and absinthe need no dispenser, but must be on hand
@@ -74,8 +74,8 @@ def test_sazerac(session):
     ing(session, "Absinthe").on_hand = True
     session.commit()
     away = {i.name: (by_hand, {d.name for d in ds}) for i, by_hand, ds in one_bottle_away(session, limit=50)}
-    assert away["Peychaud's Bitters"] == (True, {"Sazerac", "Sazerac on the Rocks"})
-    ing(session, "Peychaud's Bitters").on_hand = True
+    assert away["Bitters, Peychaud's"] == (True, {"Sazerac", "Sazerac, on the Rocks"})
+    ing(session, "Bitters, Peychaud's").on_hand = True
     session.commit()
     assert "Sazerac" in {d.name for d in makeable_drinks(session)}
 
@@ -94,19 +94,19 @@ def test_parse_amount():
 
 def test_specific_spirits_are_not_replaced_by_generic(session):
     recipes.load(session)
-    tequila, reposado = ing(session, "Tequila"), ing(session, "Reposado Tequila")
+    tequila, reposado = ing(session, "Tequila"), ing(session, "Tequila, Reposado")
     assert reposado.generic is tequila
     for name in ("Agave Syrup",):
         session.add(Dispenser(number=2, ingredient=ing(session, name)))
-    ing(session, "Angostura Bitters").on_hand = True
+    ing(session, "Bitters, Angostura").on_hand = True
     session.add(Dispenser(number=1, ingredient=tequila))
     session.commit()
     names = {d.name for d in makeable_drinks(session)}
-    assert "Tequila Old Fashioned" not in names  # asks for reposado: plain tequila won't do
+    assert "Old Fashioned, Tequila" not in names  # asks for reposado: plain tequila won't do
     session.get(Dispenser, 1).ingredient = reposado
     session.commit()
     names = {d.name for d in makeable_drinks(session)}
-    assert "Tequila Old Fashioned" in names
+    assert "Old Fashioned, Tequila" in names
     session.add(Dispenser(number=3, ingredient=ing(session, "Orange Juice")))
     session.add(Dispenser(number=4, ingredient=ing(session, "Grenadine")))
     session.commit()
@@ -115,14 +115,14 @@ def test_specific_spirits_are_not_replaced_by_generic(session):
 
 def test_ice_and_both_sazeracs(session):
     recipes.load(session)
-    assert ing(session, "Ice").on_hand and not ing(session, "Crushed Ice").on_hand
+    assert ing(session, "Ice").on_hand and not ing(session, "Ice, Crushed").on_hand
     screwdriver = drink(session, "Screwdriver")
     first = screwdriver.items[0]
     assert (first.ingredient.name, first.by_hand, first.step, first.hand_text) == \
         ("Ice", True, "before", "fill the glass with")
     assert first.parts is None  # ice isn't part of the mix: still 150 ml poured
     assert screwdriver.size_ml == 150
-    neat, rocks = drink(session, "Sazerac"), drink(session, "Sazerac on the Rocks")
+    neat, rocks = drink(session, "Sazerac"), drink(session, "Sazerac, on the Rocks")
     assert "Ice" not in {i.ingredient.name for i in neat.items}
     assert [i.ingredient.name for i in rocks.items if i.step == "before"] == ["Absinthe", "Ice"]
     assert "No ice" in neat.instructions
@@ -135,7 +135,7 @@ def test_muddled_drinks_have_before_steps(session):
     assert before == [("Mint", "6 leaves"), ("Ice", "fill the glass with")]
     caip = drink(session, "Caipirinha")
     assert [(i.ingredient.name, i.hand_text) for i in caip.items if i.by_hand] == \
-        [("Lime", "4 wedges"), ("Sugar", "2 tsp"), ("Crushed Ice", "fill the glass with")]
+        [("Lime", "4 wedges"), ("Sugar", "2 tsp"), ("Ice, Crushed", "fill the glass with")]
     wr = drink(session, "White Russian")
     cream = [i for i in wr.items if i.ingredient.name == "Half and Half"][0]
     assert cream.pumpable and cream.parts == 30 and cream.step == "after"  # pumped or by hand
@@ -151,7 +151,7 @@ def test_load_into_empty_database(session):
     assert screwdriver.size_ml == 150 and drink(session, "Godmother").size_ml == 70
     assert [(i.ingredient.name, i.parts, i.amount, i.unit) for i in screwdriver.items] == \
         [("Ice", None, 1, "fill"), ("Vodka", 50, 50, "ml"), ("Orange Juice", 100, 100, "ml")]
-    assert ing(session, "Scotch Whisky").generic is ing(session, "Whiskey")
+    assert ing(session, "Whiskey, Scotch").generic is ing(session, "Whiskey")
     # loading again changes nothing
     again = recipes.load(session)
     assert again.counts["drinks added"] == 0 and again.counts["drinks already there"] == n
@@ -179,14 +179,22 @@ def test_load_into_imported_old_database(session):
     report = recipes.load(session)
     assert report.counts["drinks already there"] >= 5   # Screwdriver, Cape Cod, ... kept as they were
     assert drink(session, "Screwdriver").source == "legacy"
-    assert "using your 'Rum, Light' for 'White Rum'" in report.notes
+    assert "using your 'Rum, Light' for 'Rum, White'" in report.notes
     assert ing(session, "Kahlua").generic.name == "Coffee Liqueur"
     assert ing(session, "Cointreau").generic.name == "Triple Sec"
-    assert ing(session, "White Rum") is None             # matched, not duplicated
+    assert ing(session, "Rum, White") is None             # matched, not duplicated
     # Kahlua on #2 now counts as Coffee Liqueur; Amaretto on #11: these classics are makeable
     after = {d.name for d in makeable_drinks(session)}
     assert {"Godmother", "Madras"} <= after
     assert len(after) > len(before)
+
+
+def test_drinks_matched_by_old_name(session):
+    session.add(Drink(name="Dry Martini", enabled=True, source="legacy"))
+    session.commit()
+    report = recipes.load(session)
+    assert report.counts["drinks already there"] == 1
+    assert drink(session, "Martini, Dry") is None   # "Dry Martini" is an alias: not added again
 
 
 def test_bad_recipe_files(tmp_path):
@@ -232,7 +240,7 @@ def test_categories(session):
     recipes.load(session)
     cat = {d.name: category_of(d) for d in session.scalars(select(Drink))}
     assert cat["Screwdriver"] == "Vodka" and cat["Godmother"] == "Vodka"   # most alcohol wins
-    assert cat["Margarita"] == "Tequila" and cat["Tequila Old Fashioned"] == "Tequila"  # Reposado
+    assert cat["Margarita"] == "Tequila" and cat["Old Fashioned, Tequila"] == "Tequila"  # Reposado
     assert cat["Sazerac"] == "Whiskey" and cat["Rusty Nail"] == "Whiskey"  # Rye, Scotch
     assert cat["Cuba Libre"] == "Rum" and cat["Dark 'n' Stormy"] == "Rum"
     assert cat["Sidecar"] == "Brandy"

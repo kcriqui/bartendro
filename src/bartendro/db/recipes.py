@@ -171,7 +171,7 @@ def load(session: Session, path: str | Path | None = None, update: bool = False)
 
     for spec in data.get("ingredient", []):
         generic = resolved[_norm(spec["name"])]
-        if spec.get("generic"):  # e.g. Reposado Tequila -> Tequila
+        if spec.get("generic"):  # e.g. Tequila, Reposado -> Tequila
             parent = resolved[_norm(spec["generic"])]
             if generic.generic_id is None and not _is_ancestor(generic, parent):
                 generic.generic = parent
@@ -187,7 +187,8 @@ def load(session: Session, path: str | Path | None = None, update: bool = False)
 
     existing = {_norm(d.name): d for d in session.scalars(select(Drink))}
     for spec in data.get("drink", []):
-        drink = existing.get(_norm(spec["name"]))
+        drink = next((existing[_norm(n)] for n in [spec["name"], *spec.get("aliases", [])]
+                      if _norm(n) in existing), None)
         if drink is not None and not (update and drink.source == SOURCE):
             report.counts["drinks already there"] += 1
             continue

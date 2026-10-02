@@ -4,3 +4,4 @@
 !src/
 src/**/__pycache__
 !deploy/demo-bot.db
+!deploy/uploads/

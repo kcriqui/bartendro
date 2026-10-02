@@ -23,7 +23,7 @@ PUMP, HAND = "pump", "hand"
 
 
 def _with_generics(session: Session, ids: set[int]) -> set[int]:
-    """`ids` plus every generic they belong to (Tito's -> Vodka; Reposado Tequila -> Tequila)."""
+    """`ids` plus every generic they belong to (Tito's -> Vodka; Tequila, Reposado -> Tequila)."""
     parents = dict(session.execute(select(Ingredient.id, Ingredient.generic_id)).all())
     have: set[int] = set()
     for ing in ids:
@@ -144,7 +144,7 @@ def uses(drink: Drink, ingredient: Ingredient) -> bool:
 # ------------------------------------------------------------------ categories
 
 def root(ing: Ingredient) -> Ingredient:
-    """The top-level generic: Reposado Tequila -> Tequila, Rye Whiskey -> Whiskey."""
+    """The top-level generic: Tequila, Reposado -> Tequila, Whiskey, Rye -> Whiskey."""
     depth = 0
     while ing.generic is not None and depth < 10:
         ing, depth = ing.generic, depth + 1
@@ -152,7 +152,7 @@ def root(ing: Ingredient) -> Ingredient:
 
 
 def spirit_of(ing: Ingredient) -> str | None:
-    """The spirit section an ingredient belongs to ("Rum" for White Rum, "Rum, Dark" or a brand
+    """The spirit section an ingredient belongs to ("Rum" for "Rum, White", "Rum, Dark" or a brand
     linked to Rum), or None for liqueurs, wine and mixers."""
     if not ing.alcoholic:
         return None
