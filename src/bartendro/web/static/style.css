@@ -87,11 +87,13 @@ h3 { font-size: 16pt; margin: 1.2em 0 .5em; }
 .back { margin-bottom: 8px; }
 .welcome { font-size: 14pt; color: var(--heading); margin: 0 0 6px; }
 /* the party robot as a faded backdrop behind the menus: big, washed out, never in the way */
-.panel { position: relative; isolation: isolate; overflow: hidden; }
+.panel, .menu-body { position: relative; isolation: isolate; }
+.panel { overflow: hidden; }
 .robot-bg { position: absolute; z-index: -1; inset: 16px 0; display: flex; justify-content: center;
             pointer-events: none; opacity: .4; }
 /* colours stronger than the black lines, so it reads as colour without fighting the text */
 .robot-bg path[fill="#000"] { fill-opacity: .35; }
+.robot-bg.right { justify-content: flex-end; padding-right: 3%; }
 .robot-bg svg { height: 100%; max-height: 680px; width: auto; max-width: 96%; }
 .party-art { display: block; width: 100%; max-width: 640px; max-height: 200px; object-fit: contain;
              margin: 0 auto 10px; }

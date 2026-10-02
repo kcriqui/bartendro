@@ -8,8 +8,8 @@
 <div class="drinks">
   {% for d in drinks %}
   <div class="drink-item">
-    <a class="btn" href="/drink/{{ d.id }}">{{ d.name }}</a>
-    <div class="ingredients">{{ d.items | rejectattr("parts", "none") | map(attribute="ingredient.name") | join(", ") }}</div>
+    <a class="btn" href="/drink/{{ d.id }}">{{ d.name | guest }}</a>
+    <div class="ingredients">{{ d.items | rejectattr("parts", "none") | map(attribute="ingredient.name") | map("guest") | join(", ") }}</div>
     {% if d.description %}<div class="desc">{{ d.description }}</div>{% endif %}
   </div>
   {% endfor %}

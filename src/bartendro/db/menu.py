@@ -22,6 +22,20 @@ NON_ALCOHOLIC = "Non-alcoholic"
 PUMP, HAND = "pump", "hand"
 
 
+def display_name(name: str) -> str:
+    """How guests see a name. Kevin's names put the base first so variants sort together
+    ("Margarita, Pineapple", "Tequila, Anejo"); menus read better the usual way round:
+    "Pineapple Margarita", "Anejo Tequila", "Martini, Vodka, Dirty" -> "Dirty Vodka Martini".
+    A qualifier starting in lower case stays after: "Sazerac, on the Rocks" -> "Sazerac on the Rocks"."""
+    parts = [p.strip() for p in (name or "").split(",")]
+    if len(parts) < 2 or not all(parts):
+        return name
+    base, rest = parts[0], parts[1:]
+    front = [p for p in reversed(rest) if not p[0].islower()]
+    back = [p for p in rest if p[0].islower()]
+    return " ".join([*front, base, *back])
+
+
 def _with_generics(session: Session, ids: set[int]) -> set[int]:
     """`ids` plus every generic they belong to (Tito's -> Vodka; Tequila, Reposado -> Tequila)."""
     parents = dict(session.execute(select(Ingredient.id, Ingredient.generic_id)).all())

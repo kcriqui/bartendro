@@ -28,9 +28,9 @@ from .. import __version__
 from ..bot import Bot, BusyError, CantPourError
 from ..db import options
 from ..db import recipes
-from ..db.menu import (PUMP, by_category, can_make, categories_of, category_of, makeable_drinks, missing_for,
-                       one_bottle_away, pumped_and_on_hand, resolve_line, scale_recipe, sort_key,
-                       strength_of, suggest_bottles, uses)
+from ..db.menu import (PUMP, by_category, can_make, categories_of, category_of, display_name, makeable_drinks,
+                       missing_for, one_bottle_away, pumped_and_on_hand, resolve_line, scale_recipe,
+                       sort_key, strength_of, suggest_bottles, uses)
 from ..db.models import (Dispenser, Drink, Ingredient, Kind, Party, PartyDrink, PourLog, RecipeItem,
                          utcnow)
 from .theme import DEFAULTS as THEME_DEFAULTS, theme_css, valid as valid_color
@@ -43,6 +43,19 @@ PREVIEW_COOKIE = "preview_party"
 LOGO_TYPES = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
 MAX_LOGO_BYTES = 2_000_000
 ESSENTIALS = 4     # drinks in "the essentials": two rows of two
+
+
+def guest_event(event: dict) -> dict:
+    """A status or pour event with names as guests see them (display_name): what's being poured
+    and the by-hand checklist ([ingredient, ml, text] lists)."""
+    event = dict(event)
+    for key in ("name", "pouring"):
+        if isinstance(event.get(key), str):
+            event[key] = display_name(event[key])
+    for key in ("before", "after"):
+        if isinstance(event.get(key), list):
+            event[key] = [[display_name(h[0]), *h[1:]] if isinstance(h, list) and h else h for h in event[key]]
+    return event
 
 
 def slugify(name: str) -> str:
@@ -110,6 +123,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             loop.call_soon_threadsafe(_broadcast, event)
 
         def _broadcast(event: dict) -> None:
+            event = guest_event(event)
             for q in list(clients):
                 q.put_nowait(event)
 
@@ -121,6 +135,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.mount("/uploads", StaticFiles(directory=uploads), name="uploads")
     templates = Jinja2Templates(directory=HERE / "templates")
+    templates.env.filters["guest"] = display_name  # "Margarita, Pineapple" -> "Pineapple Margarita"
 
     def current_party(request: Request, s) -> Party | None:
         """The party being previewed (?party=<id>, remembered in a cookie; 0 = none), else the
@@ -141,7 +156,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             path = request.url.path
             nav = "admin" if path.startswith("/admin") else "shots" if path.startswith("/shots") else "drinks"
             response = templates.TemplateResponse(request, name, {
-                "bot_name": bot_name, "status": bot.status(), "opts": opts, "amount": amount,
+                "bot_name": bot_name, "status": guest_event(bot.status()), "opts": opts, "amount": amount,
                 "version": __version__, "nav": nav, "party": party, "theme_css": theme_css(party),
                 "banner": banner, "allow_uploads": allow_uploads, **ctx})
         preview = request.query_params.get("party")
@@ -586,7 +601,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
 
     @app.get("/api/status")
     def api_status():
-        return bot.status()
+        return guest_event(bot.status())
 
     @app.get("/api/drink/{drink_id}/plan")
     def api_plan(drink_id: int, size_ml: float | None = None, strength: int = 0, tartness: int = 0):
@@ -594,26 +609,26 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
         with sessions() as s:
             names = {d.number: d.ingredient.name for d in s.scalars(select(Dispenser))
                      if d.ingredient is not None}
-        return {"name": plan.name, "size_ml": plan.size_ml,
-                "pumps": [{"dispenser": n, "ingredient": names.get(n, "?"), "ml": round(ml, 1)}
+        return {"name": display_name(plan.name), "size_ml": plan.size_ml,
+                "pumps": [{"dispenser": n, "ingredient": display_name(names.get(n, "?")), "ml": round(ml, 1)}
                           for n, ml in sorted(plan.pumps.items())],
-                "pre_pumps": [{"dispenser": n, "ingredient": names.get(n, "?"), "ml": round(ml, 1)}
+                "pre_pumps": [{"dispenser": n, "ingredient": display_name(names.get(n, "?")), "ml": round(ml, 1)}
                               for n, ml in sorted(plan.pre_pumps.items())],
                 "before": [_hand(h) for h in plan.before], "after": [_hand(h) for h in plan.after],
                 "instructions": plan.instructions, "finish": plan.finish}
 
     def _hand(h) -> dict:
-        return {"ingredient": h.ingredient, "ml": None if h.ml is None else round(h.ml, 1), "text": h.text}
+        return {"ingredient": display_name(h.ingredient), "ml": None if h.ml is None else round(h.ml, 1), "text": h.text}
 
     @app.post("/api/drink/{drink_id}/make", status_code=202)
     def api_make(drink_id: int, req: MakeRequest):
         plan = bot.make_drink(drink_id, req.size_ml, req.strength, req.tartness, background=True)
-        return {"pouring": plan.name, "ml": round(plan.pumped_ml)}
+        return {"pouring": display_name(plan.name), "ml": round(plan.pumped_ml)}
 
     @app.post("/api/shot/{number}", status_code=202)
     def api_shot(number: int, req: AmountRequest | None = None):
         plan = bot.shot(number, req.ml if req else None, background=True)
-        return {"pouring": plan.name, "ml": round(plan.pumped_ml)}
+        return {"pouring": display_name(plan.name), "ml": round(plan.pumped_ml)}
 
     @app.post("/api/dispenser/{number}/test", status_code=202)
     def api_test(number: int, req: AmountRequest | None = None):

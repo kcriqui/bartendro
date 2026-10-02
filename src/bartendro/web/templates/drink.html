@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{{ drink.name }} - {{ bot_name }}{% endblock %}
+{% block title %}{{ drink.name | guest }} - {{ bot_name }}{% endblock %}
 {% block content %}
 <section class="drink" data-drink="{{ drink.id }}" data-size="{{ size }}" data-step="{{ size_step }}"
          data-max="{{ max_size }}" data-steps="{{ opts.strength_steps }}">
-  <h1 class="drink-heading">Make: {{ drink.name }}</h1>
+  <h1 class="drink-heading">Make: {{ drink.name | guest }}</h1>
   <div class="drink-body">
     <div>
       {% if drink.description %}<p>{{ drink.description }}</p>{% endif %}
@@ -14,7 +14,7 @@
       <div class="subhead">ingredients:</div>
       <table class="recipe" id="recipe">
         {% for item in drink.items %}
-        <tr><td>{{ item.ingredient.name }}</td><td class="num"></td></tr>
+        <tr><td>{{ item.ingredient.name | guest }}</td><td class="num"></td></tr>
         {% endfor %}
       </table>
       {% if drink.finish %}<p class="serve"><b>Then:</b> {{ drink.finish }}</p>{% endif %}

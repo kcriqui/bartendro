@@ -404,3 +404,13 @@ def test_multi_spirit_drink_in_each_section_menu(env):
     admin = client.get("/admin/drinks").text
     row = admin[admin.index(">Long Island Iced Tea<"):].split("</tr>")[0]
     assert all(name in row for name in ("Vodka", "Tequila", "Rum", "Gin"))
+
+
+def test_guest_names():
+    from bartendro.web import guest_event
+    event = {"type": "done", "name": "Margarita, Tommy's",
+             "after": [["Bitters, Angostura", None, "2 dashes"]], "finish": ""}
+    assert guest_event(event) == {"type": "done", "name": "Tommy's Margarita",
+                                  "after": [["Angostura Bitters", None, "2 dashes"]], "finish": ""}
+    assert guest_event({"state": "pouring", "pouring": "Martini, Dry"})["pouring"] == "Dry Martini"
+    assert event["name"] == "Margarita, Tommy's"   # the bot's event isn't changed

@@ -7,9 +7,8 @@ from bartendro.db import open_db
 from bartendro.db import recipes
 from bartendro.db.models import PUMP_ML
 from bartendro.db.importer import import_legacy
-from bartendro.db.menu import (LIQUEURS, NON_ALCOHOLIC, by_category, categories_of, category_of, makeable_drinks,
-                               spirit_of,
-                               one_bottle_away, suggest_bottles)
+from bartendro.db.menu import (LIQUEURS, NON_ALCOHOLIC, by_category, categories_of, category_of, display_name,
+                               makeable_drinks, one_bottle_away, spirit_of, suggest_bottles)
 from bartendro.db.models import Dispenser, Drink, Ingredient
 
 DEFAULT_DB = Path(__file__).parent.parent / "ui" / "bartendro.db.default"
@@ -287,3 +286,13 @@ def test_non_alcoholic_drinks_have_no_alcohol():
     soft = [d for d in data["drink"] if not any(abv[n] for a, u, n, *_ in d["ingredients"])]
     assert len(soft) >= 7
     assert {"Shirley Temple", "Virgin Mary", "Nojito"} <= {d["name"] for d in soft}
+
+
+def test_display_name():
+    assert display_name("Margarita, Pineapple") == "Pineapple Margarita"
+    assert display_name("Tequila, Anejo") == "Anejo Tequila"
+    assert display_name("Martini, Vodka, Dirty") == "Dirty Vodka Martini"
+    assert display_name("Sazerac, on the Rocks") == "Sazerac on the Rocks"
+    assert display_name("Margarita, Tommy's") == "Tommy's Margarita"
+    assert display_name("Gin and Tonic") == "Gin and Tonic"
+    assert display_name("Odd,") == "Odd,"   # nothing after the comma: left alone

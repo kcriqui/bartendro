@@ -1,2 +1,3 @@
-{# The party robot, big and faded, behind the drink menus. #}
-<div class="robot-bg" aria-hidden="true">{% include "_robot.html" %}</div>
+{# The party robot, big and faded, behind the drink menus. `side`: "right" to keep it clear of
+   buttons on the left (shots). #}
+<div class="robot-bg {{ side | default('') }}" aria-hidden="true">{% include "_robot.html" %}</div>

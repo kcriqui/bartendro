@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Shots - {{ bot_name }}{% endblock %}
+{% block backdrop %}{% with side = "right" %}{% include "_robot_bg.html" %}{% endwith %}{% endblock %}
 {% block content %}
 <h1>Shots</h1>
 <p>Each shot is {{ amount(shot_size) }}. <b>Put a glass under the spout first!</b></p>
@@ -7,7 +8,7 @@
 {% for d in dispensers %}
 <div class="shot-row">
   <button class="btn go" data-post="/api/shot/{{ d.number }}"
-          {% if opts.use_liquid_level_sensors and d.level.value == "out" %}disabled{% endif %}>{{ d.ingredient.name }}</button>
+          {% if opts.use_liquid_level_sensors and d.level.value == "out" %}disabled{% endif %}>{{ d.ingredient.name | guest }}</button>
   <div>{{ d.ingredient.description }}{% if opts.use_liquid_level_sensors and d.level.value != "unknown" %}
     <span class="muted">{{ d.level.value }}</span>{% endif %}</div>
 </div>

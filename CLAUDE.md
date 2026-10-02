@@ -45,6 +45,7 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
    button per category (/menu/<section>); parties (theme + drink list, one active, preview with
    ?party=<id>); admin drink editor with live preview, pump cards that save on change.
    Menus: the party's logo as a banner on top, and the party robot big and faded behind the menus
+   (below the banner when there is one)
    (`_robot_bg.html` / `.robot-bg`; the drawing is `templates/_robot.html`: the original
    partyrobot.png traced to inline SVG by `scripts/trace_robot.py` - re-run, don't hand-edit),
    coloured by --robot / --robot-tray / --robot-drink / --robot-dots (party colours: tray <- frame, drink + dots <- button; web/theme.py).
@@ -75,6 +76,9 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
      are on hand.
    - Names (Kevin): base first, kind after a comma - "Tequila, Anejo", "Whiskey, Rye",
      "Margarita, Tommy's" - so variants sort together. Bundled files keep old names as aliases.
+     Guests see them the usual way round ("Tommy's Margarita", "Anejo Tequila"): `menu.display_name`,
+     the `guest` template filter and `web.guest_event` (menus, drink page, shots, pour messages);
+     admin pages and the database keep the real names, and menus still sort by the real name.
    - Specific spirits stay specific: a recipe asking for Tequila, Reposado needs reposado
      (plain Tequila won't do); a reposado bottle can make generic-Tequila drinks.
    Loader matches existing ingredients by name/alias, links brands (Kahlua -> Coffee Liqueur)

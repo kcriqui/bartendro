@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block backdrop %}{% if sections %}{% include "_robot_bg.html" %}{% endif %}{% endblock %}
+{# the robot fills the panel - or, under a party's banner, just the part below it #}
+{% block backdrop %}{% if sections and not (party and party.logo) %}{% include "_robot_bg.html" %}{% endif %}{% endblock %}
 {% block content %}
 {% macro drink_list(drinks, cls="") %}
 <div class="drinks {{ cls }}">
   {% for d in drinks %}
   <div class="drink-item">
-    <a class="btn" href="/drink/{{ d.id }}">{{ d.name }}</a>
-    <div class="ingredients">{{ d.items | rejectattr("parts", "none") | map(attribute="ingredient.name") | join(", ") }}</div>
+    <a class="btn" href="/drink/{{ d.id }}">{{ d.name | guest }}</a>
+    <div class="ingredients">{{ d.items | rejectattr("parts", "none") | map(attribute="ingredient.name") | map("guest") | join(", ") }}</div>
     {% if d.description %}<div class="desc">{{ d.description }}</div>{% endif %}
   </div>
   {% endfor %}
@@ -25,6 +26,8 @@
     {% if party.welcome %}<p class="welcome">{{ party.welcome }}</p>{% endif %}
   {% elif party and party.welcome %}<p class="welcome">{{ party.welcome }}</p>
   {% endif %}
+  <div class="menu-body">
+  {% if party and party.logo %}{% include "_robot_bg.html" %}{% endif %}
   {% if essentials %}
     <h1>the essentials</h1>
     {{ drink_list(essentials, "essentials") }}
@@ -37,6 +40,7 @@
     {% if sections | length > 1 %}
     <a class="btn plain" href="/menu/all">All drinks <span class="count">{{ total }}</span></a>
     {% endif %}
+  </div>
   </div>
 {% endif %}
 {% endblock %}

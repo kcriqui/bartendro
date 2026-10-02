@@ -91,8 +91,9 @@ section now). Deleted (Kevin): the 8 "Z Shot of ..." drinks (the Shots page does
 retired zzz drinks (4 identical to live ones, "zzz delete me", the old Margarita, Lemon /
 Pomegranate and Manhattan, Jack's). The last two lost their prefix: "Cosmopolitan, Count Drac's"
 (still switched off) and "Cucumber Gin & Pim's" (on). 200 drinks, and
-the typos "Margarita, Repasado", "Margarita, Pinapple", "Daquari, Santa Ana" plus the near-duplicates
-Corpse Reviver #2 / No. 2 and Rum, Light / Rum, White (not asked).
+the near-duplicates
+Corpse Reviver #2 / No. 2 and Rum, Light / Rum, White (not asked). Typos fixed later (Kevin): Margarita, Pineapple / Reposado,
+Daiquiri, Santa Ana.
 
 Parties in the bot database (both inactive): Halloween (from the showcase) and **Yurtville Weekend**
 (Kevin's party at the end of July at Yurtville, in the redwoods near Santa Cruz): US Forest Service
