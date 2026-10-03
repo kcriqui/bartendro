@@ -52,3 +52,19 @@ counts, and person / scanner / bot / your LAN / your tailnet / Google. The log o
 last redeploy. Visitors' real IPs show (Funnel passes them on). Scanners show up within hours of
 any Funnel URL going live (certificate transparency logs) - they only ever get 404s.
 
+## Watching for trouble
+
+The demo writes its own access log (one JSON line per request, rotated at 5 MB x 5) to
+`build/demo-logs/` in the repo folder on the NAS (`/mnt/HDD-pool/Projects/Claude/bartendro/build/demo-logs`
+mounted on `/logs`; the container runs as Kevin's NAS user 3000:3000 so it may write there - see
+`deploy/truenas-demo.yaml`). Unlike the container log it survives redeploys.
+
+`py scripts/check_demo_log.py` reports what's new since its last run (Pacific times): ALERT for a
+probe that got something other than a 404, server errors, changes (POSTs) from outside your LAN or
+tailnet, request floods, or a log that stopped; scanners that only get 404s are just counted.
+`--all` checks the whole log, `--dry-run` doesn't remember the run.
+
+A scheduled Claude task, **bartendro-demo-watch** (Claude app > Scheduled, 8 am and 8 pm), runs it and
+sends a desktop notification on ALERT. It runs only while the Claude app is open on Kevin's home PC
+(missed runs happen at the next launch).
+

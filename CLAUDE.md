@@ -171,6 +171,9 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 - "Who used the demo?": open the container log in TrueNAS (docs/hosting.md "Who has been using it"),
   run `scripts/demo-log-summary.js` in that page (Claude in Chrome javascript tool) and report its
   table. Kevin wants times in Pacific time (the script does it; PDT in summer, PST in winter).
+- Demo watch: the demo logs every request to build/demo-logs/access.log (JSON lines, survives
+  redeploys); `py scripts/check_demo_log.py` reports ALERT/OK since its last run; the scheduled
+  task `bartendro-demo-watch` (8 am / 8 pm, home PC) runs it and notifies Kevin on ALERT.
 - Visual work: show it in the preview (or build/ scratch pages served with `py -m http.server`),
   let him react, iterate; he likes side-by-side options to pick from (fonts, art).
 - Real hardware: never run pumps without Kevin's go-ahead (the CLI asks before pumping unless `-y`).

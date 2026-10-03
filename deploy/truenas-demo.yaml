@@ -10,5 +10,10 @@ services:
     restart: unless-stopped
     ports:
       - "8077:8080"
+    # access log on the NAS (P:\Claude\bartendro\build\demo-logs on Kevin's PCs), written as
+    # Kevin's NAS user so the folder's permissions allow it; scripts/check_demo_log.py reads it
+    user: "3000:3000"
+    volumes:
+      - /mnt/HDD-pool/Projects/Claude/bartendro/build/demo-logs:/logs
     environment:
       BANNER: "Demo bot with simulated pumps - nothing really pours. Changes are undone when it restarts."

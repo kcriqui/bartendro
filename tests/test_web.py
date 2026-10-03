@@ -1,3 +1,4 @@
+import json
 import time
 from pathlib import Path
 
@@ -458,3 +459,17 @@ def test_menu_cache_and_compression(env):
             d.ingredient_id = None
         s.commit()
     assert client.get("/menu/all").text.count('class="drink-item"') < before
+
+
+def test_access_log(env, tmp_path):
+    _, b, _, _ = env
+    log = tmp_path / "logs" / "access.log"
+    with TestClient(create_app(b, "Testbot", access_log=log)) as client:
+        client.get("/menu/all?x=1", headers={"User-Agent": "pytest"})
+        client.post("/api/dispenser/3/clean")
+        with client.websocket_connect("/ws") as ws:
+            ws.receive_json()
+    lines = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [(e["m"], e["path"], e["status"]) for e in lines] == [
+        ("GET", "/menu/all?x=1", 200), ("POST", "/api/dispenser/3/clean", 202), ("WS", "/ws", 101)]
+    assert lines[0]["ua"] == "pytest" and lines[0]["t"].endswith("+00:00")

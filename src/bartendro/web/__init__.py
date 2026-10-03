@@ -9,11 +9,13 @@ the hardware (or the simulator) and runs it.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import logging.handlers
 import secrets
 import time
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
@@ -63,6 +65,31 @@ def guest_event(event: dict) -> dict:
     return event
 
 
+def _access_logger(path: Path | None):
+    """record(ip, method, request, status, start) writing JSON lines to `path`, or None."""
+    if path is None:
+        return None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handler = logging.handlers.RotatingFileHandler(path, maxBytes=5_000_000, backupCount=5,
+                                                       encoding="utf-8")
+    except OSError as e:
+        log.warning("access log %s: %s - not logging requests", path, e)
+        return None
+    logger = logging.getLogger("bartendro.access")
+    logger.propagate = False
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+
+    def record(ip: str, method: str, conn, status: int, start: float) -> None:
+        url = conn.url
+        logger.info(json.dumps({
+            "t": datetime.now(timezone.utc).isoformat(timespec="seconds"), "ip": ip, "m": method,
+            "path": (url.path + ("?" + url.query if url.query else ""))[:300], "status": status,
+            "ms": round((time.monotonic() - start) * 1000), "ua": conn.headers.get("user-agent", "")[:200]}))
+    return record
+
+
 def slugify(name: str) -> str:
     return "-".join("".join(c if c.isalnum() else " " for c in name.lower()).split())
 
@@ -109,12 +136,15 @@ class PreviewRequest(BaseModel):
 
 
 def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = None,
-               banner: str = "", allow_uploads: bool = True, reload_templates: bool = False) -> FastAPI:
+               banner: str = "", allow_uploads: bool = True, reload_templates: bool = False,
+               access_log: Path | None = None) -> FastAPI:
     """`uploads`: folder for party logos (default: "uploads" next to the database).
     `banner`: a line shown on every page (the hosted demo bot: "simulated pumps").
     `allow_uploads=False`: no logo uploads (a copy that's open to the internet).
     `reload_templates`: pick up template edits without a restart (development; otherwise every
-    request checks every template file for changes - slow, especially on a network share)."""
+    request checks every template file for changes - slow, especially on a network share).
+    `access_log`: write one JSON line per request / WebSocket to this file (the hosted demo:
+    scripts/check_demo_log.py reads it to spot trouble). Rotated at 5 MB, 5 old files kept."""
     sessions = bot.sessions
     if uploads is None:
         db_file = sessions.kw["bind"].url.database
@@ -140,6 +170,17 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
 
     app = FastAPI(title="Bartendro", version=__version__, lifespan=lifespan)
     app.add_middleware(GZipMiddleware, minimum_size=1000)  # pages to phones over the bot's WiFi
+    record = _access_logger(access_log)
+
+    if record is not None:
+        @app.middleware("http")
+        async def log_requests(request: Request, call_next):
+            start = time.monotonic()
+            response = await call_next(request)
+            ip = request.client.host if request.client else ""
+            if not (ip == "127.0.0.1" and request.url.path == "/api/status"):  # the health check
+                record(ip, request.method, request, response.status_code, start)
+            return response
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.mount("/uploads", StaticFiles(directory=uploads), name="uploads")
     templates = Jinja2Templates(directory=HERE / "templates")
@@ -776,10 +817,12 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
     @app.websocket("/ws")
     async def ws(websocket: WebSocket):
         await websocket.accept()
+        if record is not None:
+            record(websocket.client.host if websocket.client else "", "WS", websocket, 101, time.monotonic())
         q: asyncio.Queue = asyncio.Queue()
         clients.add(q)
         try:
-            await websocket.send_json({"type": "status", **bot.status()})
+            await websocket.send_json(guest_event({"type": "status", **bot.status()}))
             while True:
                 await websocket.send_json(await q.get())
         except (WebSocketDisconnect, RuntimeError):

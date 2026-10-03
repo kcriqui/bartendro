@@ -42,6 +42,7 @@ def main(argv=None) -> int:
     ap.add_argument("--banner", default="", help="a line shown on every page, e.g. 'Demo: simulated pumps'")
     ap.add_argument("--no-uploads", action="store_true", help="switch off party logo uploads")
     ap.add_argument("--dev", action="store_true", help="development: pick up template edits without a restart")
+    ap.add_argument("--access-log", metavar="FILE", help="write one JSON line per request to FILE (hosted demo)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -88,7 +89,8 @@ def main(argv=None) -> int:
             bot = Bot(driver, sessions)
             bot.start()
             app = create_app(bot, cfg.name, banner=args.banner, allow_uploads=not args.no_uploads,
-                             reload_templates=args.dev)
+                             reload_templates=args.dev,
+                             access_log=Path(args.access_log) if args.access_log else None)
             uvicorn.run(app, host=args.host, port=args.port, proxy_headers=True, forwarded_allow_ips="*",
                         log_level="debug" if args.verbose else "info")
     except (ConnectError, RouterError, DriverError) as e:
