@@ -1,0 +1,354 @@
+import threading
+from pathlib import Path
+
+import pytest
+from sqlalchemy import select
+
+from bartendro import bot as bot_mod
+from bartendro.bot import Bot, BusyError, CantPourError, State
+from bartendro.db import open_db, options
+from bartendro.db.importer import import_legacy
+from bartendro.db.models import Dispenser, Drink, Ingredient, PourLog, RecipeItem
+from bartendro.hw import protocol as p
+from bartendro.hw.driver import TICKS_PER_ML, Driver
+from bartendro.hw.simulator import SimBus, SimDispenser
+
+DEFAULT_DB = Path(__file__).parent.parent / "ui" / "bartendro.db.default"
+
+
+@pytest.fixture(autouse=True)
+def fast(monkeypatch):
+    monkeypatch.setattr(SimBus, "time_scale", 1000.0)
+    monkeypatch.setattr(bot_mod, "CLEAN_SECONDS", 0)
+    monkeypatch.setattr(bot_mod, "CLEAN_STAGGER", 0)
+    monkeypatch.setattr(bot_mod, "LED_DONE_SECONDS", 0.01)
+
+
+@pytest.fixture
+def sessions(tmp_path):
+    Session = open_db(tmp_path / "bot.db")
+    with Session() as s:
+        import_legacy(DEFAULT_DB, s)  # 15 dispensers: #1 Vodka, #2 Kahlua, #3 Baileys, ...
+    return Session
+
+
+def make_bot(sessions, bus=None):
+    bus = bus or SimBus.with_dispensers(15)
+    driver = Driver(bus.serial, bus.router)
+    driver.discover()
+    b = Bot(driver, sessions)
+    b.events = []
+    b.subscribe(b.events.append)
+    b.start()
+    return b, bus
+
+
+def drink_id(sessions, name):
+    with sessions() as s:
+        return s.scalar(select(Drink.id).where(Drink.name == name))
+
+
+def test_starts_ready(sessions):
+    b, _ = make_bot(sessions)
+    assert b.state is State.READY
+    assert b.status() == {"state": "ready", "message": "", "busy": False, "dispensers": 15, "pouring": None}
+
+
+def test_make_drink(sessions):
+    b, bus = make_bot(sessions)
+    plan = b.make_drink(drink_id(sessions, "Black Russian"))
+    assert set(plan.pumps) == {1, 2} and plan.pumped_ml == pytest.approx(150)  # option drink_size
+    for n, ml in plan.pumps.items():
+        assert bus.ports[n - 1].poured_ticks == int(ml * TICKS_PER_ML)
+    assert sum(x.poured_ticks for x in bus.ports.values()) == sum(int(ml * TICKS_PER_ML) for ml in plan.pumps.values())
+    assert b.state is State.READY
+    assert [e["type"] for e in b.events][-4:] == ["status", "pouring", "done", "status"]
+    with sessions() as s:
+        log = s.scalars(select(PourLog)).one()
+        assert (log.drink_id, round(log.size_ml)) == (plan.drink_id, 150)
+
+
+def test_size_strength_and_validation(sessions):
+    b, _ = make_bot(sessions)
+    d = drink_id(sessions, "Black Russian")  # vodka 2 parts? whatever the recipe: both alcohol
+    assert b.plan_drink(d, size_ml=60).pumped_ml == pytest.approx(60)
+    with pytest.raises(CantPourError, match="size"):
+        b.plan_drink(d, size_ml=5000)
+    with pytest.raises(CantPourError, match="-2 to 2"):
+        b.plan_drink(d, strength=3)
+    with pytest.raises(CantPourError, match="no drink"):
+        b.plan_drink(9999)
+
+
+def test_missing_ingredient(sessions):
+    b, _ = make_bot(sessions)
+    with sessions() as s:  # a drink that needs something no dispenser has
+        tequila = s.scalar(select(Ingredient).where(Ingredient.name == "Tequila"))
+        s.add(Drink(id=500, name="Tequila Shot", items=[RecipeItem(ingredient=tequila, parts=1)]))
+        s.commit()
+    with pytest.raises(CantPourError, match="no dispenser has Tequila"):
+        b.make_drink(500)
+    assert b.state is State.READY
+
+
+def test_brand_on_dispenser_pours_generic_recipe(sessions):
+    b, _bus = make_bot(sessions)
+    with sessions() as s:
+        vodka = s.get(Ingredient, 1)
+        titos = Ingredient(name="Tito's", alcoholic=True, abv=40, generic=vodka)
+        s.add(titos)
+        s.flush()
+        s.get(Dispenser, 1).ingredient = titos  # #1 now holds Tito's, recipes still say Vodka
+        s.commit()
+    plan = b.make_drink(drink_id(sessions, "Black Russian"))
+    assert set(plan.pumps) == {1, 2}
+
+
+def test_manual_ingredients_are_listed_not_pumped(sessions):
+    b, _ = make_bot(sessions)
+    with sessions() as s:
+        mint = Ingredient(name="Mint", manual=True, on_hand=True)
+        vodka = s.get(Ingredient, 1)
+        s.add(Drink(id=501, name="Minty", items=[RecipeItem(ingredient=vodka, parts=3, position=0),
+                                                 RecipeItem(ingredient=mint, parts=1, position=1)]))
+        s.commit()
+    plan = b.make_drink(501, size_ml=100)
+    assert plan.pumps == pytest.approx({1: 75})
+    assert [(h.ingredient, h.ml, h.text) for h in plan.after] == [("Mint", 25, "")]
+    assert b.events[-2]["after"] == [["Mint", 25, ""]]
+
+
+def test_hand_added_dashes_and_finish(sessions):
+    b, _bus = make_bot(sessions)
+    with sessions() as s:
+        bitters = Ingredient(name="Angostura", manual=True)  # not on any dispenser
+        absinthe = Ingredient(name="Absinthe", manual=True, on_hand=True)
+        whiskey = s.scalar(select(Ingredient).where(Ingredient.name == "Whiskey"))  # dispenser #15
+        s.add(Drink(id=502, name="Sazerac-ish", finish="Stir.", size_ml=45, items=[
+            RecipeItem(ingredient=absinthe, parts=None, amount=1, unit="dash", step="before", position=0),
+            RecipeItem(ingredient=whiskey, parts=45, position=1),
+            RecipeItem(ingredient=bitters, parts=None, amount=2, unit="dash", position=2)]))
+        s.commit()
+    with pytest.raises(CantPourError, match="Angostura isn't on hand"):
+        b.make_drink(502)
+    with sessions() as s:
+        s.scalar(select(Ingredient).where(Ingredient.name == "Angostura")).on_hand = True
+        s.commit()
+    plan = b.make_drink(502)
+    assert plan.pumps == pytest.approx({15: 45})  # the dashes don't dilute the mix
+    assert [(h.ingredient, h.text) for h in plan.before] == [("Absinthe", "1 dash")]
+    assert [(h.ingredient, h.ml, h.text) for h in plan.after] == [("Angostura", None, "2 dashes")]
+    done = b.events[-2]
+    assert done["type"] == "done" and done["after"] == [["Angostura", None, "2 dashes"]]
+    assert done["finish"] == "Stir."
+
+
+def test_bitters_pumped_when_on_a_dispenser_else_by_hand(sessions):
+    b, _bus = make_bot(sessions)
+    with sessions() as s:
+        bitters = Ingredient(name="Bitters", abv=45, alcoholic=True)  # not "never pumped"
+        whiskey = s.scalar(select(Ingredient).where(Ingredient.name == "Whiskey"))  # dispenser #15
+        s.add(Drink(id=503, name="Whiskey Bitters", size_ml=60, items=[
+            RecipeItem(ingredient=whiskey, parts=60, position=0),
+            RecipeItem(ingredient=bitters, parts=None, amount=2, unit="dash", position=1)]))
+        s.commit()
+    with pytest.raises(CantPourError, match="Bitters isn't on hand"):
+        b.plan_drink(503)
+    with sessions() as s:  # put the bitters on pump #14
+        s.get(Dispenser, 14).ingredient_id = s.scalar(select(Ingredient.id).where(Ingredient.name == "Bitters"))
+        s.commit()
+    plan = b.plan_drink(503)
+    assert plan.pumps == pytest.approx({15: 60, 14: 1.8}) and plan.after == []  # 2 dashes = 1.8 ml
+    with sessions() as s:  # too little to pump accurately, and it's on hand: by hand instead
+        options.set(s, "min_pump_ml", 2)
+        s.scalar(select(Ingredient).where(Ingredient.name == "Bitters")).on_hand = True
+        s.commit()
+    plan = b.plan_drink(503)
+    assert plan.pumps == pytest.approx({15: 60}) and [h.text for h in plan.after] == ["2 dashes"]
+
+
+def test_pumped_rinse_pours_in_two_stages(sessions):
+    b, bus = make_bot(sessions)
+    with sessions() as s:
+        absinthe = Ingredient(name="Absinthe", abv=60, alcoholic=True)
+        ice = Ingredient(name="Ice", manual=True, on_hand=True)
+        whiskey = s.scalar(select(Ingredient).where(Ingredient.name == "Whiskey"))
+        s.add(Drink(id=504, name="Rinsed", size_ml=60, instructions="Swirl and discard.", items=[
+            RecipeItem(ingredient=absinthe, parts=None, amount=1, unit="dash", step="before", position=0),
+            RecipeItem(ingredient=ice, parts=None, amount=1, unit="fill", step="before", position=1),
+            RecipeItem(ingredient=whiskey, parts=60, position=2)]))
+        s.flush()
+        s.get(Dispenser, 13).ingredient = absinthe
+        s.commit()
+    plan = b.plan_drink(504)
+    assert plan.pre_pumps == pytest.approx({13: 0.9}) and plan.pumps == pytest.approx({15: 60})
+    assert [h.ingredient for h in plan.before] == ["Ice"]
+    b.make_drink(504, background=True)
+    for _ in range(500):
+        if any(e["type"] == "stage_done" for e in b.events):
+            break
+        threading.Event().wait(0.01)
+    stage = next(e for e in b.events if e["type"] == "stage_done")
+    assert stage["instructions"] == "Swirl and discard." and stage["before"][0][0] == "Ice"
+    assert bus.ports[12].poured_ticks > 0 and bus.ports[14].poured_ticks == 0  # rinse only, so far
+    assert b.status()["busy"]
+    b.continue_pour()
+    for _ in range(500):
+        if not b.status()["busy"]:
+            break
+        threading.Event().wait(0.01)
+    assert bus.ports[14].poured_ticks == int(60 * TICKS_PER_ML)
+    assert b.events[-2]["type"] == "done"
+    # cancelling between the stages pours nothing more
+    b.make_drink(504, background=True)
+    for _ in range(500):
+        if b._waiting:
+            break
+        threading.Event().wait(0.01)
+    b.continue_pour(cancel=True)
+    for _ in range(500):
+        if not b.status()["busy"]:
+            break
+        threading.Event().wait(0.01)
+    assert bus.ports[14].poured_ticks == int(60 * TICKS_PER_ML)
+    assert any(e["type"] == "cancelled" for e in b.events)
+    with pytest.raises(CantPourError, match="nothing is waiting"):
+        b.continue_pour()
+
+
+def test_busy(sessions, monkeypatch):
+    b, _ = make_bot(sessions)
+    gate = threading.Event()
+    release = threading.Event()
+    real = b.driver.pour_ml
+
+    def slow_pour(*a, **kw):
+        gate.set()
+        release.wait(5)
+        return real(*a, **kw)
+    monkeypatch.setattr(b.driver, "pour_ml", slow_pour)
+    d = drink_id(sessions, "Black Russian")
+    b.make_drink(d, background=True)
+    assert gate.wait(5)
+    assert b.status()["busy"] and b.state is State.POURING and b.status()["pouring"] == "Black Russian"
+    with pytest.raises(BusyError):
+        b.make_drink(d)
+    with pytest.raises(BusyError):
+        b.clean()
+    release.set()
+    for _ in range(500):
+        if not b.status()["busy"]:
+            break
+        threading.Event().wait(0.01)
+    assert b.state is State.READY and not b.status()["busy"]
+
+
+def test_stalled_pump_needs_reset(sessions):
+    b, bus = make_bot(sessions)
+    bus.ports[1].over_current = True
+    d = drink_id(sessions, "Black Russian")
+    b.make_drink(d)
+    assert b.state is State.CURRENT_SENSE and "stalled" in b.message
+    with pytest.raises(CantPourError, match="reset"):
+        b.make_drink(d)
+    bus.ports[1].over_current = False
+    b.reset()
+    assert b.state is State.READY
+    b.make_drink(d)
+    assert b.state is State.READY
+
+
+def test_hardware_error_becomes_error_state(sessions, monkeypatch):
+    b, _ = make_bot(sessions)
+    monkeypatch.setattr(b.driver, "dispense_ticks", lambda *a, **kw: False)
+    b.make_drink(drink_id(sessions, "Black Russian"))
+    assert b.state is State.ERROR and "failed" in b.message
+    assert not b.status()["busy"]
+
+
+def test_liquid_levels(sessions):
+    with sessions() as s:
+        options.set(s, "use_liquid_level_sensors", True)
+        s.commit()
+    bus = SimBus({i: SimDispenser(i + 1, level=200) for i in range(15)})
+    bus.ports[1].level = 100   # Kahlua low
+    b, _ = make_bot(sessions, bus)
+    assert b.state is State.LOW
+    bus.ports[0].level = 50    # Vodka out
+    b.check_levels()
+    assert b.state is State.OUT
+    with sessions() as s:
+        assert s.get(Dispenser, 1).level.value == "out"
+    with pytest.raises(CantPourError, match="Vodka is out"):
+        b.make_drink(drink_id(sessions, "Black Russian"))
+    with pytest.raises(CantPourError, match="is out"):
+        b.shot(1)
+    for d in bus.ports.values():
+        d.level = 10
+    b.check_levels()
+    assert b.state is State.HARD_OUT
+
+
+def test_shot_and_test_dispense(sessions):
+    b, bus = make_bot(sessions)
+    plan = b.shot(3)
+    assert plan.name == "Baileys" and bus.ports[2].poured_ticks == int(30 * TICKS_PER_ML)
+    b.test_dispense(4, 10)
+    assert bus.ports[3].poured_ticks == int(10 * TICKS_PER_ML)
+    with sessions() as s:
+        logs = s.scalars(select(PourLog)).all()
+        assert [(l.ingredient_id, l.size_ml) for l in logs] == [(plan_ing(s, 3), 30)]  # test not logged
+    with pytest.raises(CantPourError, match="no dispenser #16"):
+        b.shot(16)
+
+
+def plan_ing(s, number):
+    return s.get(Dispenser, number).ingredient_id
+
+
+def test_calibration_per_dispenser(sessions):
+    b, bus = make_bot(sessions)
+    with sessions() as s:
+        s.get(Dispenser, 3).ticks_per_ml = 3.0
+        s.commit()
+    b.shot(3, 20)
+    assert bus.ports[2].poured_ticks == 60
+
+
+def test_run_pump_and_clean(sessions, monkeypatch):
+    b, bus = make_bot(sessions)
+    b.run_pump(5, 1, reverse=True)
+    assert bus.ports[4].direction == p.MOTOR_DIRECTION_FORWARD  # set back after running in reverse
+    started = []
+    real_start = b.driver.start
+    monkeypatch.setattr(b.driver, "start", lambda i: started.append(i) or real_start(i))
+    b.clean("left")
+    assert started == bot_mod.CLEAN_LEFT
+    assert not any(x.dispensing for x in bus.ports.values())
+    assert b.state is State.READY
+
+
+def test_small_bot_cleans_all_pumps(sessions, monkeypatch):
+    bus = SimBus.with_dispensers(3)
+    b, _ = make_bot(sessions, bus)
+    started = []
+    real_start = b.driver.start
+    monkeypatch.setattr(b.driver, "start", lambda i: started.append(i) or real_start(i))
+    b.clean("left")  # no left/right on a 3-pump bot
+    assert started == [0, 1, 2]
+    assert b.dispenser_count == 3
+    with pytest.raises(CantPourError, match="no dispenser #4"):
+        b.shot(4)
+
+
+def test_clean_one_pump(sessions, monkeypatch):
+    b, bus = make_bot(sessions)
+    started = []
+    real_start = b.driver.start
+    monkeypatch.setattr(b.driver, "start", lambda i: started.append(i) or real_start(i))
+    b.clean_pump(7)
+    assert started == [6]
+    assert not any(x.dispensing for x in bus.ports.values())
+    assert b.state is State.READY
+    with pytest.raises(CantPourError, match="no dispenser #16"):
+        b.clean_pump(16)

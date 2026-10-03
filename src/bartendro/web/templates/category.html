@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - {{ bot_name }}{% endblock %}
+{% block backdrop %}{% include "_robot_bg.html" %}{% endblock %}
+{% block content %}
+<a class="btn small back" href="/">&larr; Menu</a>
+<h1>{{ title }}</h1>
+{% if not drinks %}<p class="empty">Nothing from this section can be made right now.</p>{% endif %}
+<div class="drinks">
+  {% for d in drinks %}
+  <div class="drink-item">
+    <a class="btn" href="/drink/{{ d.id }}">{{ d.name | guest }}</a>
+    <div class="ingredients">{{ d.items | rejectattr("parts", "none") | map(attribute="ingredient.name") | map("guest") | join(", ") }}</div>
+    {% if d.description %}<div class="desc">{{ d.description }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

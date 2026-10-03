@@ -1,0 +1,19 @@
+# TrueNAS SCALE: Apps > Discover Apps > (three dots) Install via YAML, name "bartendro-demo".
+# Builds the demo bot straight from GitHub (branch modernize) and serves it on port 8077 of the
+# NAS; Tailscale Funnel then makes it public (docs/hosting.md). Redeploy to pick up new code.
+services:
+  bartendro:
+    build:
+      context: https://github.com/kcriqui/bartendro.git#modernize
+    image: bartendro-demo:latest
+    pull_policy: build
+    restart: unless-stopped
+    ports:
+      - "8077:8080"
+    # access log on the NAS (P:\Claude\bartendro\build\demo-logs on Kevin's PCs), written as
+    # Kevin's NAS user so the folder's permissions allow it; scripts/check_demo_log.py reads it
+    user: "3000:3000"
+    volumes:
+      - /mnt/HDD-pool/Projects/Claude/bartendro/build/demo-logs:/logs
+    environment:
+      BANNER: "Demo bot with simulated pumps - nothing really pours. Changes are undone when it restarts."

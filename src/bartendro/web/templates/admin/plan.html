@@ -1,0 +1,13 @@
+{% extends "admin/layout.html" %}
+{% set tab = "plan" %}
+{% block title %}Plan bottles - {{ bot_name }}{% endblock %}
+{% block admin %}
+<form method="get" action="/admin/plan" class="button-row">
+  <label>Pumps <input name="pumps" class="short" inputmode="numeric" value="{{ pumps }}"></label>
+  <button class="btn">Suggest</button>
+</form>
+<p>With <b>{{ bottles | map(attribute="name") | join(", ") or "nothing" }}</b> on {{ pumps }} pump(s)
+   the bot can make {{ drinks | length }} drink(s) from the menu:</p>
+<p>{{ drinks | map(attribute="name") | join(", ") or "-" }}</p>
+<p class="hint">Counts the drinks switched on in Admin &gt; Drinks; bottles added by hand don't need a pump.</p>
+{% endblock %}
