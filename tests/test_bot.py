@@ -8,7 +8,7 @@ from bartendro import bot as bot_mod
 from bartendro.bot import Bot, BusyError, CantPourError, State
 from bartendro.db import open_db, options
 from bartendro.db.importer import import_legacy
-from bartendro.db.models import Dispenser, Drink, Ingredient, Kind, PourLog, RecipeItem
+from bartendro.db.models import Dispenser, Drink, Ingredient, PourLog, RecipeItem
 from bartendro.hw import protocol as p
 from bartendro.hw.driver import TICKS_PER_ML, Driver
 from bartendro.hw.simulator import SimBus, SimDispenser
@@ -92,7 +92,7 @@ def test_missing_ingredient(sessions):
 
 
 def test_brand_on_dispenser_pours_generic_recipe(sessions):
-    b, bus = make_bot(sessions)
+    b, _bus = make_bot(sessions)
     with sessions() as s:
         vodka = s.get(Ingredient, 1)
         titos = Ingredient(name="Tito's", alcoholic=True, abv=40, generic=vodka)
@@ -119,7 +119,7 @@ def test_manual_ingredients_are_listed_not_pumped(sessions):
 
 
 def test_hand_added_dashes_and_finish(sessions):
-    b, bus = make_bot(sessions)
+    b, _bus = make_bot(sessions)
     with sessions() as s:
         bitters = Ingredient(name="Angostura", manual=True)  # not on any dispenser
         absinthe = Ingredient(name="Absinthe", manual=True, on_hand=True)
@@ -144,7 +144,7 @@ def test_hand_added_dashes_and_finish(sessions):
 
 
 def test_bitters_pumped_when_on_a_dispenser_else_by_hand(sessions):
-    b, bus = make_bot(sessions)
+    b, _bus = make_bot(sessions)
     with sessions() as s:
         bitters = Ingredient(name="Bitters", abv=45, alcoholic=True)  # not "never pumped"
         whiskey = s.scalar(select(Ingredient).where(Ingredient.name == "Whiskey"))  # dispenser #15

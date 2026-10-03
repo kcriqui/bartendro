@@ -27,7 +27,7 @@ import json
 import re
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -41,7 +41,7 @@ OURS = [ipaddress.ip_network(n) for n in ("127.0.0.0/8", "172.16.0.0/12", "192.1
                                           "10.0.0.0/8", "100.64.0.0/10")]  # LAN, Docker, tailnet
 APP_PATHS = re.compile(r"^/($|menu(/|$)|drink/|shots$|admin(/|$)|api/|static/|uploads/|ws$|favicon\.ico$)")
 PROBE = re.compile(r"\.(php|asp|aspx|jsp|cgi|env|git|sql|bak|zip|tar|gz|xml|yml|yaml|ini|log|pwd)\b|"
-                   r"/(wp-|\.well-known/|_ignition|actuator|cgi-bin|vendor/|admin\.php|phpmyadmin)", re.I)
+                   r"/(wp-|\.well-known/|_ignition|actuator|cgi-bin|vendor/|admin\.php|phpmyadmin)", re.IGNORECASE)
 
 
 def ours(ip: str) -> bool:
@@ -89,9 +89,8 @@ def check(entries: list[dict], since: datetime | None, now: datetime) -> tuple[l
 
     got_somewhere = [e for e in new if not APP_PATHS.match(e["path"].split("?")[0]) and e["status"] not in (404, 405)
                      and e["m"] != "WS"]
-    for e in got_somewhere[:10]:
-        alerts.append(f"{e['ip']} {e['m']} {e['path']} -> {e['status']} at {pacific(e['time'])} "
-                      f"(not an app page, but not a 404)")
+    alerts.extend(f"{e['ip']} {e['m']} {e['path']} -> {e['status']} at {pacific(e['time'])} "
+                  f"(not an app page, but not a 404)" for e in got_somewhere[:10])
     errors = [e for e in new if e["status"] >= 500]
     if errors:
         by = Counter(f"{e['m']} {e['path'].split('?')[0]}" for e in errors)
@@ -141,7 +140,7 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     state = json.loads(STATE.read_text()) if STATE.exists() else {}
     since = None if args.all or "last" not in state else datetime.fromisoformat(state["last"])
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     entries = read_log()
     alerts, notes = check(entries, since, now)
     period = f"since {pacific(since)}" if since else "whole log"

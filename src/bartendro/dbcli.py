@@ -20,10 +20,8 @@ from sqlalchemy import func, select
 
 from . import __version__
 from . import config as config_mod
-from .db import current_revision, make_engine, open_db, upgrade
-from .db import options
+from .db import current_revision, make_engine, open_db, options, recipes, upgrade
 from .db.importer import ImportError_, import_legacy
-from .db import recipes
 from .db.menu import makeable_drinks, one_bottle_away, suggest_bottles
 from .db.models import Dispenser, Drink, Ingredient, PourLog
 

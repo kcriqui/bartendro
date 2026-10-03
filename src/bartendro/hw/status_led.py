@@ -33,7 +33,7 @@ class StatusLED:
                 "green": LED(GREEN_BCM),
                 "blue": LED(BLUE_BCM),
             }
-        except Exception as e:  # gpiozero raises several types when no GPIO is present
+        except Exception as e:  # noqa: BLE001 - gpiozero raises several types when no GPIO is present
             log.warning("cannot open status LED GPIO (%s): status LED disabled", e)
             self._leds = None
             return False

@@ -21,7 +21,7 @@ def valid(color: str) -> str:
 def _mix(color: str, other: str, amount: float) -> str:
     a = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
     b = [int(other[i:i + 2], 16) for i in (1, 3, 5)]
-    return "#" + "".join(f"{round(x + (y - x) * amount):02x}" for x, y in zip(a, b))
+    return "#" + "".join(f"{round(x + (y - x) * amount):02x}" for x, y in zip(a, b, strict=True))
 
 
 def lighter(color: str, amount: float = 0.3) -> str:

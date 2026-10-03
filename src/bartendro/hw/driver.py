@@ -88,7 +88,7 @@ class Driver:
         for port in range(self.ports):
             self.router.select(port)
             time.sleep(0.01)
-            for attempt in range(DISCOVERY_RETRIES):
+            for _attempt in range(DISCOVERY_RETRIES):
                 self.ser.reset_input_buffer()
                 self.ser.write(b"???")  # each '?' makes the dispenser send its id
                 data = self.ser.read(3)
@@ -273,7 +273,7 @@ class Driver:
         """Pour {dispenser index: ml} at the same time and wait until all pumps stop.
         Same logic as mixer._dispense_recipe: amounts under 20 ml go at half speed.
         `ticks_per_ml` overrides the calibration per dispenser index (default TICKS_PER_ML)."""
-        for i, ml in amounts.items():
+        for ml in amounts.values():
             if ml and not 0 < ml <= MAX_DISPENSE_ML:
                 raise DriverError(f"refusing to pour {ml} ml (limit {MAX_DISPENSE_ML})")
 

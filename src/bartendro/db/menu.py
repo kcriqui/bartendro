@@ -62,12 +62,6 @@ def pumped_and_on_hand(session: Session, dispenser_count: int | None = None) -> 
     return _with_generics(session, pumped), _with_generics(session, on_hand)
 
 
-def available_ingredients(session: Session, dispenser_count: int | None = None) -> set[int]:
-    """Everything that can go in a drink right now, pumped or by hand."""
-    pumped, on_hand = pumped_and_on_hand(session, dispenser_count)
-    return pumped | on_hand
-
-
 def resolve_line(item: RecipeItem, pumped: set[int], on_hand: set[int]) -> str | None:
     """PUMP if the line can be pumped and its ingredient is on a dispenser, else HAND if it's on
     hand, else None (the drink can't be made). The bot may still move a tiny pumped amount to

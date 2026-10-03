@@ -59,7 +59,6 @@ class State(str, enum.Enum):
     ERROR = "error"
 
 
-RESTING = {State.READY, State.LOW, State.OUT, State.HARD_OUT}
 STATUS_COLORS = {  # case status LED, as the old _state_* functions set it
     State.READY: (0, 1, 0), State.LOW: (1, 1, 0), State.OUT: (1, 0, 0),
     State.HARD_OUT: (1, 0, 0), State.ERROR: (1, 0, 0), State.CURRENT_SENSE: (1, 0, 0),

@@ -35,7 +35,7 @@ def snap(rgb):
     # a grey between the black lines and the grey body is closer to the tray blue than to either:
     # keep greys grey
     choices = NEUTRAL if max(rgb) - min(rgb) < 24 else PALETTE
-    return min(choices, key=lambda c: sum((a - b) ** 2 for a, b in zip(c, rgb)))
+    return min(choices, key=lambda c: sum((a - b) ** 2 for a, b in zip(c, rgb, strict=True)))
 
 
 def main():

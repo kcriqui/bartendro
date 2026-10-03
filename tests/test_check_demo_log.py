@@ -1,5 +1,5 @@
 import importlib.util
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
@@ -7,7 +7,7 @@ spec = importlib.util.spec_from_file_location(
 cdl = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cdl)
 
-NOW = datetime(2026, 10, 3, 20, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 3, 20, 0, tzinfo=UTC)
 
 
 def entry(minutes_ago, ip, m, path, status):

@@ -128,7 +128,7 @@ class SimBus:
         self.router = _SimRouter(self)
 
     @classmethod
-    def with_dispensers(cls, n: int, **kw) -> "SimBus":
+    def with_dispensers(cls, n: int, **kw) -> SimBus:
         return cls({port: SimDispenser(dispenser_id=port + 1, **kw) for port in range(n)})
 
 

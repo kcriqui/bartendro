@@ -63,7 +63,7 @@ def get_all(session: Session) -> dict[str, bool | int | str]:
     return {k: get(session, k) for k in DEFAULTS}
 
 
-def set(session: Session, key: str, value: bool | int | str) -> None:  # noqa: A001 - mirrors get()
+def set(session: Session, key: str, value: bool | int | str) -> None:
     if key not in DEFAULTS:
         raise KeyError(f"unknown option {key!r}")
     value = parse(key, _format(value))  # validate / normalise the type

@@ -1,7 +1,6 @@
 import pytest
 
 from bartendro.cli import main
-from bartendro.hw import protocol as p
 from bartendro.hw.driver import TICKS_PER_ML, Driver, DriverError, OverCurrentError
 from bartendro.hw.simulator import SimBus, SimDispenser
 

@@ -14,11 +14,11 @@ import logging
 import logging.handlers
 import secrets
 import time
-from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from contextlib import asynccontextmanager, suppress
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,14 +30,28 @@ from starlette.datastructures import UploadFile
 
 from .. import __version__
 from ..bot import Bot, BusyError, CantPourError
-from ..db import generation, options
-from ..db import recipes
-from ..db.menu import (PUMP, by_category, can_make, categories_of, category_of, display_name, makeable_drinks,
-                       missing_for, one_bottle_away, pumped_and_on_hand, resolve_line, scale_recipe,
-                       sort_key, strength_of, suggest_bottles, uses)
-from ..db.models import (Dispenser, Drink, Ingredient, Kind, Party, PartyDrink, PourLog, RecipeItem,
-                         utcnow)
-from .theme import DEFAULTS as THEME_DEFAULTS, theme_css, valid as valid_color
+from ..db import generation, options, recipes
+from ..db.menu import (
+    by_category,
+    can_make,
+    categories_of,
+    category_of,
+    display_name,
+    makeable_drinks,
+    missing_for,
+    one_bottle_away,
+    pumped_and_on_hand,
+    resolve_line,
+    scale_recipe,
+    sort_key,
+    strength_of,
+    suggest_bottles,
+    uses,
+)
+from ..db.models import Dispenser, Drink, Ingredient, Kind, Party, PartyDrink, PourLog, RecipeItem, utcnow
+from .theme import DEFAULTS as THEME_DEFAULTS
+from .theme import theme_css
+from .theme import valid as valid_color
 
 log = logging.getLogger(__name__)
 HERE = Path(__file__).parent
@@ -84,7 +98,7 @@ def _access_logger(path: Path | None):
     def record(ip: str, method: str, conn, status: int, start: float) -> None:
         url = conn.url
         logger.info(json.dumps({
-            "t": datetime.now(timezone.utc).isoformat(timespec="seconds"), "ip": ip, "m": method,
+            "t": datetime.now(UTC).isoformat(timespec="seconds"), "ip": ip, "m": method,
             "path": (url.path + ("?" + url.query if url.query else ""))[:300], "status": status,
             "ms": round((time.monotonic() - start) * 1000), "ua": conn.headers.get("user-agent", "")[:200]}))
     return record
@@ -229,7 +243,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             for d in drinks:
                 categories_of(d)
                 for item in d.items:
-                    item.ingredient.name
+                    item.ingredient.name  # noqa: B018 - loads it now, while the session is open
             menu_cache.update(key=key, at=time.monotonic(), drinks=drinks)
         return list(menu_cache["drinks"])
 
@@ -351,10 +365,8 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
                 d.ticks_per_ml = float(cal) if cal else None
             s.commit()
         if not bot.status()["busy"]:
-            try:
+            with suppress(BusyError):
                 bot.check_levels(background=True)  # refresh READY / HARD_OUT for the new menu
-            except BusyError:
-                pass
         return RedirectResponse("/admin", status_code=303)
 
     @app.get("/admin/drinks")
@@ -427,7 +439,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             rows: dict[int, tuple] = {}
             created = []
             for name, amount, unit, step in zip(form.getlist("ing_name"), form.getlist("amount"),
-                                                form.getlist("unit"), form.getlist("step")):
+                                                form.getlist("unit"), form.getlist("step"), strict=True):
                 name = " ".join(str(name).split())
                 if not name:
                     continue
@@ -550,10 +562,8 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
                 if isinstance(default, bool):
                     options.set(s, key, bool(form.get(key)))
                 elif key in form:
-                    try:
+                    with suppress(ValueError):  # a bad value keeps the old one
                         options.set(s, key, str(form[key]))
-                    except ValueError:
-                        pass  # keep the old value
             s.commit()
         return RedirectResponse("/admin/options", status_code=303)
 
@@ -739,10 +749,8 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             result = {"ingredient": d.ingredient.name if d.ingredient else "", "makes": makes,
                       "menu": len(makeable)}
         if not bot.status()["busy"]:
-            try:
+            with suppress(BusyError):
                 bot.check_levels(background=True)
-            except BusyError:
-                pass
         return result
 
     @app.post("/api/pumps/run", status_code=202)

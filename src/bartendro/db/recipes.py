@@ -85,30 +85,6 @@ def _validate(data: dict, p: Path) -> None:
             raise RecipeFileError(f"{p}: {d['name']}: nothing for the pumps to pour")
 
 
-def parse_amount(text: str) -> tuple[float | None, float | None, str, str]:
-    """Admin form entry -> (parts, amount, unit, step): "2" is 2 parts, "30 ml" / "1 oz" are
-    parts in ml, "2 dash" (or leaf, wedge, tsp, ...; plurals ok) is counted and added by hand.
-    A trailing "before" / "after" says when a by-hand amount goes in (default after)."""
-    words = text.strip().lower().split()
-    step = "after"
-    if words and words[-1] in STEPS:
-        step = words.pop()
-    if not words or len(words) > 2:
-        raise ValueError(f"amount {text!r}: a number, optionally a unit, then before/after")
-    amount = float(words[0])
-    if amount <= 0:
-        raise ValueError(f"amount {text!r} must be more than 0")
-    if len(words) == 1:
-        return amount, None, "", step
-    unit = words[1]
-    singular = {v: k for k, v in HAND_UNITS.items()}.get(unit, unit)
-    if singular in HAND_UNITS:
-        return None, amount, singular, step
-    if unit in UNITS_ML:
-        return amount * UNITS_ML[unit], amount, unit, step
-    raise ValueError(f"unit {unit!r}: use ml, cl, oz or {', '.join(HAND_UNITS)}")
-
-
 EDITOR_UNITS = ["parts", *UNITS_ML, *HAND_UNITS]  # the unit choices in the drink editor
 
 

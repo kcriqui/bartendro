@@ -9,10 +9,21 @@ Schema changes go through Alembic (db/migrations) - never edit a released migrat
 from __future__ import annotations
 
 import enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import (Boolean, CheckConstraint, DateTime, Enum, Float, ForeignKey, Integer,
-                        MetaData, String, Text, UniqueConstraint)
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    MetaData,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 # Stable constraint names so Alembic migrations (batch mode on SQLite) can find them.
@@ -36,7 +47,7 @@ def _enum(cls):
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)  # SQLite has no time zones: store UTC
+    return datetime.now(UTC).replace(tzinfo=None)  # SQLite has no time zones: store UTC
 
 
 class Kind(str, enum.Enum):
@@ -109,7 +120,6 @@ class Drink(Base):
 
 
 class RecipeItem(Base):
-    __tablename__ = "recipe_item"
     """One ingredient of a drink: its share of the mix (`parts`; recipes from the bundled file
     use ml as parts and keep the amount as written in `amount` + `unit`, e.g. 2 oz).
 

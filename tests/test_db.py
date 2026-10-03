@@ -7,12 +7,10 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import select
 
-from bartendro.db import make_engine, open_db, upgrade
-from bartendro.db import options
+from bartendro.db import make_engine, open_db, options, upgrade
 from bartendro.db.importer import ImportError_, import_legacy
-from bartendro.db.menu import available_ingredients, makeable_drinks, scale_recipe
-from bartendro.db.models import (Base, Dispenser, Drink, Ingredient, Kind, Level, PourLog,
-                                 RecipeItem)
+from bartendro.db.menu import makeable_drinks, pumped_and_on_hand, scale_recipe
+from bartendro.db.models import Base, Dispenser, Drink, Ingredient, Kind, Level, PourLog, RecipeItem
 from bartendro.dbcli import main as dbcli
 
 DEFAULT_DB = Path(__file__).parent.parent / "ui" / "bartendro.db.default"
@@ -302,8 +300,9 @@ def test_levels_ignored_when_sensors_were_off(tmp_path, session):
 def test_generic_and_manual_ingredients_make_drinks_available(tmp_path, session):
     import_legacy(make_old_db(tmp_path / "old.db"), session)
     # Tito's on #1 counts as Vodka; Mint Leaves are manual; Simple Syrup's dispenser is out
-    assert {1, 2, 3, 5} <= available_ingredients(session)
-    assert 4 not in available_ingredients(session)
+    available = set().union(*pumped_and_on_hand(session))
+    assert {1, 2, 3, 5} <= available
+    assert 4 not in available
     assert [d.name for d in makeable_drinks(session)] == ["Drink 3", "Mojito-ish"]  # gimlet needs syrup
     options.set(session, "use_liquid_level_sensors", False)
     assert {d.id for d in makeable_drinks(session)} == {1, 2, 3}

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import delete, func, select, update
@@ -39,7 +39,7 @@ OLD_LEVELS = {0: Level.OUT, 1: Level.OK, 2: Level.LOW}  # mixer.LL_OUT / LL_OK /
 NOT_IMPORTED = ("custom_drink", "custom_drink_booze", "wanted_drink_list")
 
 
-class ImportError_(Exception):  # noqa: N801 - don't shadow the builtin ImportError
+class ImportError_(Exception):  # not ImportError: that's a Python builtin
     pass
 
 
@@ -84,7 +84,8 @@ class _Old:
 
 
 def _get(row: sqlite3.Row, col: str, default=None):
-    return row[col] if col in row.keys() and row[col] is not None else default
+    # .keys(): `col in row` would search a sqlite3.Row's values, not its column names
+    return row[col] if col in row.keys() and row[col] is not None else default  # noqa: SIM118
 
 
 def _bool(value, default: bool) -> bool:
@@ -270,7 +271,7 @@ def _import_options(old_options: dict[str, object], session: Session, report: Re
 
 
 def _epoch(t) -> datetime:
-    return datetime.fromtimestamp(int(t), timezone.utc).replace(tzinfo=None)
+    return datetime.fromtimestamp(int(t), UTC).replace(tzinfo=None)
 
 
 def _import_logs(old: _Old, session: Session, report: Report) -> None:

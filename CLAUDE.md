@@ -153,6 +153,11 @@ Bookworm (Python 3.11 - keep code 3.11-compatible). One codebase, per-bot config
 
 ## Testing
 - `pip install -e ".[dev]"` then `pytest` (no hardware needed). `bartendro-hw --sim N ...`.
+- Lint: `py -m ruff check src tests scripts` (config in pyproject; must stay clean). Coverage:
+  `pytest --cov=bartendro --cov-report=term-missing`. Dead code: `vulture src/bartendro` (mostly
+  false alarms: routes, SQLAlchemy events, migrations). Review ruff's `--unsafe-fixes` by hand -
+  SIM118 once turned `col in row.keys()` into `col in row`, which is wrong for a sqlite3.Row.
+  `ruff format` isn't applied (would reflow ~35 files).
 - Before committing, run pytest and stop if anything fails (a `| tail` pipe hides the exit code -
   that let a failing commit through once).
 - Local preview like the demo: `bartendro-web --sim 15 --start-from deploy/demo-bot.db --db

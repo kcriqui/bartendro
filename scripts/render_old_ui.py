@@ -34,7 +34,7 @@ def load_drinks():
     drinks = []
     for d in c.execute("SELECT d.id, d.desc, d.popular, n.name FROM drink d JOIN drink_name n "
                        "ON n.id = d.name_id ORDER BY n.name"):
-        ings = [dict(name=r["name"], id=r["id"], parts=r["value"], type=r["type"])
+        ings = [{"name": r["name"], "id": r["id"], "parts": r["value"], "type": r["type"]}
                 for r in c.execute("SELECT b.name, b.id, db.value, b.type FROM drink_booze db "
                                    "JOIN booze b ON b.id = db.booze_id WHERE db.drink_id = ?", (d["id"],))]
         if ings and all(i["id"] in have for i in ings):
@@ -54,8 +54,8 @@ def main() -> None:
     if (OUT / "static").exists():
         shutil.rmtree(OUT / "static")
     shutil.copytree(STATIC, OUT / "static")
-    common = dict(options=OPTIONS, title="Bartendro",
-                  current_user=NS(is_authenticated=lambda: False))
+    common = {"options": OPTIONS, "title": "Bartendro",
+              "current_user": NS(is_authenticated=lambda: False)}
     pages = {
         "index.html": env.get_template("index").render(
             top_drinks=top, other_drinks=other, lucky_drink_id=0, error_message="", **common),

@@ -3,8 +3,8 @@ import time
 from pathlib import Path
 
 import pytest
-from markupsafe import escape
 from fastapi.testclient import TestClient
+from markupsafe import escape
 from sqlalchemy import select
 
 from bartendro import bot as bot_mod
@@ -54,7 +54,7 @@ def black_russian(sessions):
 
 
 def test_pages_render(env):
-    client, b, _, sessions = env
+    client, _b, _, sessions = env
     d = black_russian(sessions)
     for url in ["/", "/menu/all", "/menu/vodka", f"/drink/{d}", "/shots", "/admin", "/admin/drinks",
                 f"/admin/drink/{d}",
@@ -75,7 +75,7 @@ def test_pages_render(env):
 
 
 def test_classic_recipes_and_plan(env):
-    client, b, _, sessions = env
+    client, _b, _, sessions = env
     r = client.post("/admin/recipes/load", follow_redirects=False)
     assert r.status_code == 303 and "loaded=" in r.headers["location"]
     assert "Added" in client.get(r.headers["location"]).text
@@ -172,7 +172,7 @@ def rows(*lines):
 
 
 def test_admin_drink_edit(env):
-    client, b, _, sessions = env
+    client, _b, _, sessions = env
     r = client.post("/admin/drink/new", data={
         "name": "Screwdriver Deluxe", "description": "OJ + vodka", "enabled": "on",
         **rows(("Vodka", "1", "parts"), ("orange juice", "2", "parts"), ("", "", "ml"), ("Vodka", "1", "parts"))},
@@ -234,7 +234,7 @@ def test_drink_preview(env):
 
 
 def test_admin_drink_list_states(env):
-    client, b, _, sessions = env
+    client, _b, _, sessions = env
     page = client.get("/admin/drinks").text
     assert "on the menu" in page and "needs Tequila" in page
     br = drink_ids(sessions, "Black Russian")[0]
@@ -291,7 +291,7 @@ def test_admin_options(env):
 
 
 def test_hand_added_amounts_in_admin_and_plan(env):
-    client, b, _, sessions = env
+    client, _b, _, sessions = env
     client.post("/admin/recipes/load")
     with sessions() as s:
         manhattan = s.scalar(select(Drink).where(Drink.name == "Manhattan")).id
@@ -324,7 +324,7 @@ def drink_ids(sessions, *names):
 
 
 def test_parties(env, tmp_path):
-    client, b, _, sessions = env
+    client, _b, _, sessions = env
     br, cc, sd = drink_ids(sessions, "Black Russian", "Cape Cod", "Screwdriver")
     assert client.get("/admin/parties").status_code == 200
     assert client.get("/admin/party/new").status_code == 200
@@ -395,7 +395,7 @@ def test_theme_css():
 
 
 def test_multi_spirit_drink_in_each_section_menu(env):
-    client, b, _, sessions = env
+    client, _b, _, _sessions = env
     client.post("/admin/recipes/load")
     # (the old db's name for white rum is "Rum, Light"; loading the classics matched it)
     for n, name in [(2, "Tequila"), (3, "Rum, Light"), (4, "Gin"), (5, "Triple Sec"), (6, "Lemon Juice"),
@@ -422,7 +422,7 @@ def test_guest_names():
 
 
 def test_party_robot_and_led_sign(env):
-    client, b, _, sessions = env
+    client, _b, _, sessions = env
     r = client.post("/admin/party/new", data={"name": "Bar2D2", "robot": "bar2d2",
                                                "marquee": "  My Name is Bar2D2,\n I think I love you ;)  "},
                     follow_redirects=False)
@@ -447,7 +447,7 @@ def test_party_robot_and_led_sign(env):
 
 
 def test_menu_cache_and_compression(env):
-    client, b, _, sessions = env
+    client, _b, _, sessions = env
     r = client.get("/menu/all", headers={"Accept-Encoding": "gzip"})
     assert r.headers.get("content-encoding") == "gzip"
     before = r.text.count('class="drink-item"')

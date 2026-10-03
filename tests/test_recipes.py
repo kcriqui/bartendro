@@ -3,13 +3,21 @@ from pathlib import Path
 import pytest
 from sqlalchemy import func, select
 
-from bartendro.db import open_db
-from bartendro.db import recipes
-from bartendro.db.models import PUMP_ML
+from bartendro.db import open_db, recipes
 from bartendro.db.importer import import_legacy
-from bartendro.db.menu import (LIQUEURS, NON_ALCOHOLIC, by_category, categories_of, category_of, display_name,
-                               makeable_drinks, one_bottle_away, spirit_of, suggest_bottles)
-from bartendro.db.models import Dispenser, Drink, Ingredient
+from bartendro.db.menu import (
+    LIQUEURS,
+    NON_ALCOHOLIC,
+    by_category,
+    categories_of,
+    category_of,
+    display_name,
+    makeable_drinks,
+    one_bottle_away,
+    spirit_of,
+    suggest_bottles,
+)
+from bartendro.db.models import PUMP_ML, Dispenser, Drink, Ingredient
 
 DEFAULT_DB = Path(__file__).parent.parent / "ui" / "bartendro.db.default"
 
@@ -41,7 +49,7 @@ def test_bundled_file_is_valid_and_simple():
                  if (u not in recipes.UNITS_ML or n in manual) and s != ["before"]]
         assert pumped, d["name"]
         assert 45 <= sum(a * recipes.UNITS_ML[u] for a, u, _ in pumped) <= 250, d["name"]
-        for a, u, n, *_ in d["ingredients"]:
+        for _a, u, n, *_ in d["ingredients"]:
             if u not in recipes.UNITS_ML and u not in PUMP_ML:
                 assert n in manual, (d["name"], n)  # leaves, wedges, ice: never pumped
         text = (d.get("instructions", "") + " " + d.get("description", "")).lower()
@@ -77,18 +85,6 @@ def test_sazerac(session):
     ing(session, "Bitters, Peychaud's").on_hand = True
     session.commit()
     assert "Sazerac" in {d.name for d in makeable_drinks(session)}
-
-
-def test_parse_amount():
-    assert recipes.parse_amount("2") == (2, None, "", "after")
-    assert recipes.parse_amount("30 ml") == (30, 30, "ml", "after")
-    assert recipes.parse_amount("1 oz") == (pytest.approx(29.57), 1, "oz", "after")
-    assert recipes.parse_amount("3 dashes") == (None, 3, "dash", "after")
-    assert recipes.parse_amount("1 Barspoon") == (None, 1, "barspoon", "after")
-    assert recipes.parse_amount("6 leaves before") == (None, 6, "leaf", "before")
-    for bad in ("", "lots", "2 pints", "0", "1 2 3", "before"):
-        with pytest.raises(ValueError):
-            recipes.parse_amount(bad)
 
 
 def test_specific_spirits_are_not_replaced_by_generic(session):
@@ -136,7 +132,7 @@ def test_muddled_drinks_have_before_steps(session):
     assert [(i.ingredient.name, i.hand_text) for i in caip.items if i.by_hand] == \
         [("Lime", "4 wedges"), ("Sugar", "2 tsp"), ("Ice, Crushed", "fill the glass with")]
     wr = drink(session, "White Russian")
-    cream = [i for i in wr.items if i.ingredient.name == "Half and Half"][0]
+    cream = next(i for i in wr.items if i.ingredient.name == "Half and Half")
     assert cream.pumpable and cream.parts == 30 and cream.step == "after"  # pumped or by hand
     assert not ing(session, "Half and Half").manual and not ing(session, "Half and Half").on_hand
 
