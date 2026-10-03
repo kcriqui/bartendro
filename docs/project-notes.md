@@ -58,6 +58,11 @@ Since 2026-10-02 it runs a copy of the bot database (`deploy/demo-bot.db`, commi
 that over mounting build/bartendro.db from the NAS, so his recipes are public on GitHub) instead of
 the showcase. Refresh: copy build/bartendro.db over it, push, redeploy.
 Public URL: **https://truenas-scale.tail4c32e5.ts.net** (LAN: http://truenas:8077).
+Watching it (2026-10-03): access log on the NAS + `scripts/check_demo_log.py`, run by the scheduled
+Claude task bartendro-demo-watch on Kevin's home PC only (he chose that over a NAS cron job; runs
+missed while the PC is off happen at the next app launch, nothing is lost). Kevin: if the reports
+show a lot of scanners, password-protect the demo site (shared password, demo only - the bots stay
+login-free).
 - New code reaches it only when the app is edited/redeployed in TrueNAS (`pull_policy: build`).
 - The first build failed with a transient "SSL connection timeout" fetching from GitHub; a retry
   worked. If it recurs, publish a prebuilt image (GHCR) instead of building on the NAS.
