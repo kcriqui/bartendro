@@ -42,3 +42,13 @@ Share that URL. Stop sharing: `tailscale funnel --https=443 off` (or `tailscale 
 
 Funnel hostnames appear in public certificate logs, so expect the odd crawler, not just the
 people you send the link to. Restart the app to undo whatever visitors changed.
+
+## Who has been using it
+
+TrueNAS: Apps > bartendro-demo > Workloads > bartendro > View Logs, set Tail Lines to 20000,
+Connect. Then paste [`scripts/demo-log-summary.js`](../scripts/demo-log-summary.js) into the browser
+console (F12 > Console) on that page: one row per IP with first/last visit in Pacific time, request
+counts, and person / scanner / bot / your LAN / your tailnet / Google. The log only goes back to the
+last redeploy. Visitors' real IPs show (Funnel passes them on). Scanners show up within hours of
+any Funnel URL going live (certificate transparency logs) - they only ever get 404s.
+
