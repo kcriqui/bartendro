@@ -22,3 +22,5 @@ dist/
 pytest-cache-files-*/
 build/
 !deploy/demo-bot.db
+.coverage
+htmlcov/
