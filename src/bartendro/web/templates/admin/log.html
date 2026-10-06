@@ -1,0 +1,19 @@
+{% extends "admin/layout.html" %}
+{% set tab = "log" %}
+{% block title %}Log - {{ bot_name }}{% endblock %}
+{% block admin %}
+<p>Last {{ days }} days &middot; <a href="?days=1">1</a> <a href="?days=7">7</a> <a href="?days=30">30</a>
+   <a href="?days=3650">all</a> &middot; {{ amount(total) }} poured</p>
+<h3>Drinks</h3>
+<table class="grid">
+  <tr><th>Drink</th><th>Poured</th><th>Volume</th></tr>
+  {% for name, n, ml in rows %}<tr><td>{{ name }}</td><td class="num">{{ n }}</td><td class="num">{{ amount(ml) }}</td></tr>{% endfor %}
+</table>
+{% if shots %}
+<h3>Shots</h3>
+<table class="grid">
+  <tr><th>Bottle</th><th>Shots</th><th>Volume</th></tr>
+  {% for name, n, ml in shots %}<tr><td>{{ name }}</td><td class="num">{{ n }}</td><td class="num">{{ amount(ml) }}</td></tr>{% endfor %}
+</table>
+{% endif %}
+{% endblock %}

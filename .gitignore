@@ -12,3 +12,15 @@ ui/logs
 dispenser/old
 master/old
 firmware/dispenser/last_pump_id.txt
+
+# Python 3 rewrite
+__pycache__/
+.venv/
+.pytest_cache/
+*.egg-info/
+dist/
+pytest-cache-files-*/
+build/
+!deploy/demo-bot.db
+.coverage
+htmlcov/
