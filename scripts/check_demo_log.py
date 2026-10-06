@@ -16,7 +16,8 @@ Raises an alert for:
   - changes (POST, success) from outside Kevin's LAN / tailnet - someone using admin or pumps
   - a flood: one address making more than FLOOD_PER_MIN requests in a minute
   - the log missing or not written for LOG_STALE_HOURS (logging broken or the demo down)
-Scanners that only collect 404s are normal on a public URL: counted, not alerted.
+Scanners that only collect 404s are normal on a public URL, and so are crawlers (named by their user
+agent; the demo's robots.txt asks them to stay out): both are summarised, not alerted.
 """
 
 from __future__ import annotations
@@ -39,7 +40,9 @@ FLOOD_PER_MIN = 120
 LOG_STALE_HOURS = 36
 OURS = [ipaddress.ip_network(n) for n in ("127.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
                                           "10.0.0.0/8", "100.64.0.0/10")]  # LAN, Docker, tailnet
-APP_PATHS = re.compile(r"^/($|menu(/|$)|drink/|shots$|admin(/|$)|api/|static/|uploads/|ws$|favicon\.ico$)")
+APP_PATHS = re.compile(r"^/($|menu(/|$)|drink/|shots$|admin(/|$)|api/|static/|uploads/|ws$|favicon\.ico$|robots\.txt$)")
+# a crawler says so in its user agent: "...; ClaudeBot/1.0; +claudebot@anthropic.com", Googlebot, GPTBot...
+CRAWLER = re.compile(r"([\w.-]*(bot|crawler|spider|slurp)[\w.-]*)(/[\d.]+)?", re.IGNORECASE)
 PROBE = re.compile(r"\.(php|asp|aspx|jsp|cgi|env|git|sql|bak|zip|tar|gz|xml|yml|yaml|ini|log|pwd)\b|"
                    r"/(wp-|\.well-known/|_ignition|actuator|cgi-bin|vendor/|admin\.php|phpmyadmin)", re.IGNORECASE)
 
@@ -108,16 +111,32 @@ def check(entries: list[dict], since: datetime | None, now: datetime) -> tuple[l
     for ip, n in floods.items():
         alerts.append(f"{ip} made {n} requests in one minute (flood / scraping?)")
 
+    total = Counter(e["ip"] for e in new)
+    crawlers: dict[str, dict] = {}
+    for e in new:
+        m = CRAWLER.search(e.get("ua", ""))
+        if m and not ours(e["ip"]):
+            c = crawlers.setdefault(m.group(1), {"requests": 0, "admin": 0, "ips": set()})
+            c["requests"] += 1
+            c["admin"] += e["path"].startswith("/admin")
+            c["ips"].add(e["ip"])
+    for name, c in sorted(crawlers.items(), key=lambda x: -x[1]["requests"]):
+        notes.append(f"crawler {name}: {c['requests']} requests ({c['admin']} admin pages) from "
+                     + ", ".join(sorted(c["ips"])[:3]))
+    crawler_ips = {ip for c in crawlers.values() for ip in c["ips"]}
     scanners = defaultdict(int)
     for e in new:
+        if e["ip"] in crawler_ips:
+            continue
         if e["status"] in (404, 405) and (PROBE.search(e["path"]) or not APP_PATHS.match(e["path"].split("?")[0])):
             scanners[e["ip"]] += 1
     if scanners:
         notes.append(f"routine scanning: {sum(scanners.values())} probes from {len(scanners)} address(es), "
-                     f"all 404 - " + ", ".join(f"{ip} x{n}" for ip, n in sorted(scanners.items(), key=lambda x: -x[1])[:8]))
+                     "all refused - " + ", ".join(f"{ip} ({n} probes / {total[ip]} requests)" for ip, n in
+                                                  sorted(scanners.items(), key=lambda x: -x[1])[:8]))
     people = defaultdict(lambda: {"pages": 0, "live": 0, "first": None, "last": None})
     for e in new:
-        if e["ip"] in scanners or ours(e["ip"]):
+        if e["ip"] in scanners or e["ip"] in crawler_ips or ours(e["ip"]):
             continue
         p = people[e["ip"]]
         p["first"] = p["first"] or e["time"]

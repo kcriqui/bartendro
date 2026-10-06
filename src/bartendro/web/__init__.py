@@ -20,7 +20,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -270,6 +270,12 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
         return JSONResponse({"error": str(exc)}, status_code=400)
 
     # ------------------------------------------------------------------ pages
+
+    @app.get("/robots.txt", response_class=PlainTextResponse)
+    def robots():
+        """Keep search engines and AI crawlers out: the hosted demo is public (they crawled its
+        admin pages), and a bot has no business being indexed anyway."""
+        return "User-agent: *\nDisallow: /\n"
 
     @app.get("/")
     def menu(request: Request):

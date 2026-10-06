@@ -45,3 +45,15 @@ def test_only_new_entries_and_stale_log():
     assert any("nothing logged since" in a for a in alerts)   # 48 h of silence
     assert "no new requests since the last check" in notes
     assert cdl.check([], None, NOW)[0][0].startswith("no access log")
+
+
+def test_crawlers_are_named_and_not_called_scanners():
+    bot = "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)"
+    entries = [dict(entry(50, "216.73.216.151", "GET", "/robots.txt", 404), ua=bot)]
+    entries += [dict(entry(40 - i, "216.73.216.151", "GET", f"/admin/drink/{i}", 200), ua=bot) for i in range(5)]
+    entries += [entry(30, "34.178.29.9", "GET", "/wp-login.php", 404), entry(29, "34.178.29.9", "GET", "/", 200)]
+    alerts, notes = cdl.check(entries, None, NOW)
+    assert alerts == []
+    assert "crawler ClaudeBot: 6 requests (5 admin pages) from 216.73.216.151" in notes
+    scanning = next(n for n in notes if n.startswith("routine scanning"))
+    assert "216.73.216.151" not in scanning and "34.178.29.9 (1 probes / 2 requests)" in scanning

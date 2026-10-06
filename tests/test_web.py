@@ -473,3 +473,10 @@ def test_access_log(env, tmp_path):
     assert [(e["m"], e["path"], e["status"]) for e in lines] == [
         ("GET", "/menu/all?x=1", 200), ("POST", "/api/dispenser/3/clean", 202), ("WS", "/ws", 101)]
     assert lines[0]["ua"] == "pytest" and lines[0]["t"].endswith("+00:00")
+
+
+def test_robots_txt(env):
+    client = env[0]
+    r = client.get("/robots.txt")
+    assert r.status_code == 200 and r.text == "User-agent: *\nDisallow: /\n"
+    assert '<meta name="robots" content="noindex, nofollow">' in client.get("/").text
