@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 160" width="480" height="160">
+  <!-- Yurtville Weekend: a banjo under laser beams in the redwoods. Drawn for this project. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#08160d"/>
+      <stop offset="1" stop-color="#1f4d2b"/>
+    </linearGradient>
+    <radialGradient id="head" cx=".45" cy=".4" r=".7">
+      <stop offset="0" stop-color="#fbf6e6"/>
+      <stop offset="1" stop-color="#e2d6b2"/>
+    </radialGradient>
+    <clipPath id="frame"><rect width="480" height="160" rx="14"/></clipPath>
+    <g id="tree">
+      <rect x="-3" y="-10" width="6" height="40" fill="#4a2f17"/>
+      <path d="M0 -120 L14 -80 L8 -80 L22 -40 L12 -40 L28 0 L-28 0 L-12 -40 L-22 -40 L-8 -80 L-14 -80 Z"
+            fill="#0c2414"/>
+    </g>
+  </defs>
+  <g clip-path="url(#frame)">
+    <rect width="480" height="160" fill="url(#sky)"/>
+    <g fill="#f3ead2">
+      <circle cx="40" cy="18" r="1.2"/><circle cx="96" cy="34" r="1"/><circle cx="150" cy="12" r="1.4"/>
+      <circle cx="330" cy="16" r="1.1"/><circle cx="392" cy="38" r="1"/><circle cx="448" cy="14" r="1.3"/>
+    </g>
+    <!-- lasers: wide faint glow under a thin bright beam -->
+    <g stroke-linecap="round" opacity=".95">
+      <g stroke-width="7" opacity=".22">
+        <line x1="240" y1="150" x2="10" y2="-5" stroke="#39ff14"/>
+        <line x1="240" y1="150" x2="120" y2="-5" stroke="#ff2d55"/>
+        <line x1="240" y1="150" x2="215" y2="-5" stroke="#00e5ff"/>
+        <line x1="240" y1="150" x2="290" y2="-5" stroke="#39ff14"/>
+        <line x1="240" y1="150" x2="370" y2="-5" stroke="#ff2d55"/>
+        <line x1="240" y1="150" x2="470" y2="-5" stroke="#00e5ff"/>
+      </g>
+      <g stroke-width="1.6">
+        <line x1="240" y1="150" x2="10" y2="-5" stroke="#9dff86"/>
+        <line x1="240" y1="150" x2="120" y2="-5" stroke="#ff8fa6"/>
+        <line x1="240" y1="150" x2="215" y2="-5" stroke="#8ff4ff"/>
+        <line x1="240" y1="150" x2="290" y2="-5" stroke="#9dff86"/>
+        <line x1="240" y1="150" x2="370" y2="-5" stroke="#ff8fa6"/>
+        <line x1="240" y1="150" x2="470" y2="-5" stroke="#8ff4ff"/>
+      </g>
+    </g>
+    <!-- redwoods -->
+    <use href="#tree" transform="translate(30 150) scale(1.15)"/>
+    <use href="#tree" transform="translate(78 152) scale(.85)"/>
+    <use href="#tree" transform="translate(112 154) scale(.6)"/>
+    <use href="#tree" transform="translate(452 150) scale(1.2)"/>
+    <use href="#tree" transform="translate(404 152) scale(.9)"/>
+    <use href="#tree" transform="translate(368 154) scale(.6)"/>
+    <!-- forest floor -->
+    <path d="M0 146 Q120 136 240 144 T480 142 V160 H0 Z" fill="#5b3a1e"/>
+    <!-- banjo -->
+    <g transform="translate(232 104) rotate(-32)">
+      <rect x="-5" y="-118" width="10" height="90" rx="2" fill="#6b4423"/>
+      <path d="M-8 -142 h16 l3 26 h-22 z" fill="#4a2f17"/>
+      <g fill="#c8a24a">
+        <circle cx="-9" cy="-136" r="2.4"/><circle cx="-10" cy="-126" r="2.4"/>
+        <circle cx="9" cy="-136" r="2.4"/><circle cx="10" cy="-126" r="2.4"/>
+        <circle cx="7" cy="-82" r="2.4"/>
+      </g>
+      <circle r="34" fill="#c8a24a"/>
+      <circle r="29" fill="url(#head)"/>
+      <g fill="#8a6a2a">
+        <circle cx="0" cy="-31.5" r="1.4"/><circle cx="22" cy="-22" r="1.4"/><circle cx="31.5" cy="0" r="1.4"/>
+        <circle cx="22" cy="22" r="1.4"/><circle cx="0" cy="31.5" r="1.4"/><circle cx="-22" cy="22" r="1.4"/>
+        <circle cx="-31.5" cy="0" r="1.4"/><circle cx="-22" cy="-22" r="1.4"/>
+      </g>
+      <rect x="-9" y="9" width="18" height="4" rx="1" fill="#6b4423"/>
+      <rect x="-5" y="27" width="10" height="9" rx="2" fill="#8a6a2a"/>
+      <g stroke="#7a6a50" stroke-width=".7">
+        <line x1="-3" y1="-138" x2="-3" y2="31"/><line x1="-1.5" y1="-138" x2="-1.5" y2="31"/>
+        <line x1="0" y1="-138" x2="0" y2="31"/><line x1="1.5" y1="-138" x2="1.5" y2="31"/>
+        <line x1="3" y1="-82" x2="3" y2="31"/>
+      </g>
+    </g>
+    <!-- notes -->
+    <g fill="#f2c04c">
+      <ellipse cx="300" cy="104" rx="6" ry="4.5" transform="rotate(-20 300 104)"/>
+      <rect x="304.5" y="72" width="2" height="31"/>
+      <path d="M306.5 72 q10 4 8 16 q-1 -8 -8 -9 z"/>
+      <ellipse cx="168" cy="82" rx="5" ry="3.8" transform="rotate(-20 168 82)"/>
+      <ellipse cx="186" cy="76" rx="5" ry="3.8" transform="rotate(-20 186 76)"/>
+      <rect x="171.8" y="56" width="1.8" height="25"/><rect x="189.8" y="50" width="1.8" height="25"/>
+      <path d="M171.8 56 L191.6 50 V55 L171.8 61 Z"/>
+    </g>
+  </g>
+</svg>

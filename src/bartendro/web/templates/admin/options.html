@@ -1,0 +1,17 @@
+{% extends "admin/layout.html" %}
+{% set tab = "options" %}
+{% block title %}Options - {{ bot_name }}{% endblock %}
+{% block admin %}
+<form method="post" action="/admin/options" class="form">
+  {% for key, default in fields %}
+    {% if default is sameas true or default is sameas false %}
+    <label class="check"><input type="checkbox" name="{{ key }}" {% if opts[key] %}checked{% endif %}> {{ key | replace("_", " ") }}</label>
+    {% else %}
+    <label>{{ key | replace("_", " ") }} <input name="{{ key }}" value="{{ opts[key] }}"
+           {% if default is number %}class="short" inputmode="numeric"{% endif %}></label>
+    {% endif %}
+  {% endfor %}
+  <p class="hint">Sizes are in ml. "metric" shows ml instead of fluid ounces.</p>
+  <button class="btn primary">Save</button>
+</form>
+{% endblock %}
