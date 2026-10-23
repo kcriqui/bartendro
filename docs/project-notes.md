@@ -16,6 +16,19 @@ status to every screen. Why: the WiFi web UI was always unreliable on the old bo
 screen must not depend on WiFi. Kiosk setup belongs to milestone 5. No login for anyone (Kevin's
 call); the hosted demo is open too.
 
+**DSI alternatives looked at (2026-10-23, SparkFun):** Kevin won't go beyond a Pi 4, which rules
+out the **Raspberry Pi Touch Display 2 - 10"** (1200x1920 portrait, DSI, $96.95): Pi 5 / Compute
+Module only. The rest of Raspberry Pi's line works on every Pi with a DSI port (all but the Zero):
+- **Touch Display 2 - 7"** (720x1280 portrait, $84.95): the best DSI option for a Pi 4 - one ribbon
+  for video + touch, first-party support, sharp; rotate to landscape in the OS (touch follows) or
+  use it upright. But 7" is under the 8"+ Kevin wanted for the 15-pump bots, it has no case, and it
+  takes power from the Pi header's 5 V + GND pins - check that the router board's header cable
+  leaves room (router uses I2C + serial, status LED BCM 23/24/25; no electrical clash).
+- Touch Display 2 - 5" (720x1280, $53.95): too small for a big menu; fine for a 3-pump bot.
+- Original 7" Raspberry Pi LCD (800x480, $88.30): old and low-res - skip.
+Decision: the **Waveshare 10.1" HDMI/USB stays the choice for the 15-pump bots** (only 8"+ option
+that works on a Pi 4); a Touch Display 2 7" (or 5") is the pick if a small 3-pump bot ever gets a screen.
+
 ## Mini-router (3-port) vs 15-port router firmware (2026-10-01)
 
 Firmware unchanged since 2013. The first hardware test is planned on a Pi + mini-router + 1-2
