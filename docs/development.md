@@ -80,8 +80,7 @@ refused even for root.
 **Easiest (2026-10-31, works): the TrueNAS REST API** - no login needed. `POST /app/redeploy` with
 body `"bartendro-demo"` rebuilds the image from GitHub (`pull_policy: build`) and restarts it
 (~1 min); poll `GET /core/get_jobs?id=<job>` until SUCCESS. Call it through `nas_cron.call()` in
-`P:\Claude\SLP-eBay-tools	ools
-as_cron.py` (reads the bearer token from `truenas_key.json`
+`P:\Claude\SLP-eBay-tools\tools\nas_cron.py` (reads the bearer token from `truenas_key.json`
 there; import it, don't touch anything else in that project). Then check with curl
 (`http://truenas:8077/...`) and the public URL.
 
