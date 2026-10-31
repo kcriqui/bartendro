@@ -404,7 +404,10 @@ class Bot:
         self._check()
 
     def _reset(self) -> None:
-        self.driver.led_idle()
+        # Restart the dispensers through the router's reset line and find them again, like the
+        # old /ws/reset (driver.reset() = close + open). A stalled dispenser ignores every motor
+        # and LED command until it restarts, so sending led_idle alone (as we did) left it dead.
+        self.driver.discover()
         self._check()
 
     def _safe_led_idle(self) -> None:

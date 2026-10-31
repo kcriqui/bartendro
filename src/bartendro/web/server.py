@@ -42,6 +42,8 @@ def main(argv=None) -> int:
     ap.add_argument("--banner", default="", help="a line shown on every page, e.g. 'Demo: simulated pumps'")
     ap.add_argument("--no-uploads", action="store_true", help="switch off party logo uploads")
     ap.add_argument("--dev", action="store_true", help="development: pick up template edits without a restart")
+    ap.add_argument("--sim-view-only", action="store_true",
+                    help="the /sim page can watch the simulated pumps but not jam them (for a public copy)")
     ap.add_argument("--access-log", metavar="FILE", help="write one JSON line per request to FILE (hosted demo)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
@@ -90,7 +92,8 @@ def main(argv=None) -> int:
             bot.start()
             app = create_app(bot, cfg.name, banner=args.banner, allow_uploads=not args.no_uploads,
                              reload_templates=args.dev,
-                             access_log=Path(args.access_log) if args.access_log else None)
+                             access_log=Path(args.access_log) if args.access_log else None,
+                             sim_controls=not args.sim_view_only)
             uvicorn.run(app, host=args.host, port=args.port, proxy_headers=True, forwarded_allow_ips="*",
                         log_level="debug" if args.verbose else "info")
     except (ConnectError, RouterError, DriverError) as e:

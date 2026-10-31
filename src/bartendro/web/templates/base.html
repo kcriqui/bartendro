@@ -16,6 +16,7 @@
     <a href="/" class="{{ 'on' if nav == 'drinks' }}">Cocktails</a>
     <a href="/shots" class="{{ 'on' if nav == 'shots' }}">Shots</a>
     <a href="/admin" class="{{ 'on' if nav == 'admin' }}">Admin</a>
+    {% if sim %}<a href="/sim" target="bartendro-sim" class="sim-link" title="Testing: watch the simulated pumps in a second window">Sim</a>{% endif %}
   </nav>
   <a class="logo" href="/">
     {% if party and party.title %}<span class="party-title">{{ party.title }}</span>{% endif %}

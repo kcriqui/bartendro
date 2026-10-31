@@ -31,9 +31,22 @@ dispenser plan, shots, test dispense, pump runs, clean (all / left #5-#11 / righ
 pumping in a thread; listeners get status / pour events.
 
 **Web (`web/`)** - `create_app(bot)`: pages, JSON API under `/api`, WebSocket `/ws`. `server.py` =
-`bartendro-web [--sim N] [--dev] [--start-from FILE] [--access-log FILE] [--showcase] [--banner ...]
+`bartendro-web [--sim N] [--sim-view-only] [--dev] [--start-from FILE] [--access-log FILE] [--showcase] [--banner ...]
 [--no-uploads]`, port 8080. `templates/`, `static/` (style.css, app.js, led-font.js), `theme.py`
 (party colours -> CSS variables; logos in `<db dir>/uploads`).
+
+**Simulator page (`/sim`, 2026-10-31)** - only when the pumps are simulated (`--sim N`): the
+dispensers 3 wide (Kevin's bots are 3 x 5, `SIM_COLUMNS`) with their LEDs animated using the
+firmware's own patterns and timing (copied from `firmware/dispenser/led.c` into `static/sim.js`),
+rotors turning while pumping, ml for the current run and in total (ticks / the pump's
+calibration), and the liquid level. Open it in a second window next to the menu: the "Sim" link in
+the top bar (shown only when simulating) opens it in a window of its own. Fed by the WebSocket
+`/ws/sim` (state sent when it changes, at most every 0.1 s). Controls: **Jam** (the pump stalls
+when it runs, like a blocked tube: current sense, blinking red, the bot asks for a reset) and
+level buttons (Full / Low / Out; only used with "use liquid level sensors" on).
+`--sim-view-only` hides them and refuses `/api/sim/...` (for a public copy; the hosted demo keeps them). The simulator
+(`hw/simulator.py`) behaves like the firmware here: a stalled dispenser ignores motor and LED
+commands until the router's reset restarts it.
 
 **Other:** `config.py` (per-bot TOML, `docs/bartendro.example.toml`), `cli.py` (`bartendro-hw`),
 `dbcli.py` (`bartendro-db`), `showcase.py` (bundled drinks + 15 bottles + a demo party for

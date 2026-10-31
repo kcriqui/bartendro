@@ -6,6 +6,9 @@ a copy of the bot database committed as `deploy/demo-bot.db` and resets on every
 To update the demo's drinks and bottles: copy `build/bartendro.db` over `deploy/demo-bot.db`, push,
 redeploy. (`bartendro-web --showcase` instead starts from the bundled drinks + 15 demo bottles.)
 There's no login: anyone with the link can use everything, admin included; logo uploads are off.
+The simulator page (`/sim`, "Sim" in the top bar) has its Jam / level buttons here too (Kevin's
+call, 2026-10-31). Visitors share one bot, so one visitor can jam a pump under someone else's
+drink; add `--sim-view-only` to the Dockerfile's command if that becomes a problem.
 
 ## 1. Run the container on TrueNAS
 

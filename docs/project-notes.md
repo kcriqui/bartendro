@@ -185,3 +185,24 @@ maybe 8-10x slower than that PC, a Pi 3B+ another 2-3x) - measure on the real bo
 - To check on real hardware: page timings (small benchmark script), Chromium memory over an
   evening, steady frame rate of the LED sign.
 
+## Dispenser LEDs (2026-10-31)
+
+Each dispenser has an RGB LED driven by its own firmware (`firmware/dispenser/led.c`), with five
+built-in patterns: idle (red -> green -> blue, ~1 s each), pouring (red <-> blue), drink done (green
+pulse), clean (purple / orange), stalled (fast red blink, set by the dispenser itself). Animation
+steps come from the router's sync line: one step per 10 toggles of 1.024 ms = ~10 ms.
+
+Like the old app, we send every LED command to all dispensers at once, so during a pour all 15
+show "pouring", even the ones not in the drink. What the firmware also allows (no reflashing):
+- **Per-dispenser commands**: a dispenser acts on packets for everyone or for its own id, and the
+  LED commands work either way. So the pumps in the drink could show "pouring" and the rest stay
+  idle or go dark, and each pump could turn green when its share is done.
+- **Custom patterns**: `pattern_define` / `pattern_add_segment` / `pattern_finish` (in
+  `hw/driver.py`, unused) replace a built-in pattern's colours on one dispenser - party colours.
+  Only 32 segments per dispenser until it restarts (they can't be freed), and lost on a restart,
+  so set them once after discovery (and again after a Reset).
+- Per-dispenser commands don't resync the sync line, so those dispensers' fades may drift out of
+  step. Sending "done" mid-pour adds one packet to the pour loop - time it on a real bot.
+
+Kevin was interested ("could we make the active dispensers look different while dispensing?"); the
+simulator page (`/sim`) came first so it can be built and seen without hardware. Not started.

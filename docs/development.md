@@ -19,7 +19,7 @@ If git complains about "dubious ownership" on the share:
 
 ## Tests and code quality
 
-- `pytest` (no hardware needed; 108 tests). `bartendro-hw --sim N ...` for the hardware CLI.
+- `pytest` (no hardware needed; 113 tests). `bartendro-hw --sim N ...` for the hardware CLI.
 - **Before committing, run pytest and stop if anything fails.** A `| tail` pipe hides the exit code -
   that once let a failing commit through.
 - Lint: `py -m ruff check src tests scripts` (config in pyproject; must stay clean). `ruff format`
@@ -35,6 +35,9 @@ If git complains about "dubious ownership" on the share:
 `bartendro-web --sim 15 --start-from deploy/demo-bot.db --db <scratch>/demo.db --port 8093
 --no-uploads --dev` - restart it after Python changes; `--dev` makes template edits live (without it
 templates are read once); static files are always live.
+- `.claude/launch.json` has this as `bartendro-demo-copy` (port 8093, db in `build/sim-test/`).
+- Watching the pumps: the **Sim** link in the top bar opens `/sim` in a second window (simulated
+  pumps only).
 - `?party=<id>` previews a party via a cookie shared by every localhost port; `?party=0` clears it.
 - The built-in browser pane throttles animations while it's hidden.
 - Visual work: show it in the preview (or a `build/` scratch page served with `py -m http.server`),

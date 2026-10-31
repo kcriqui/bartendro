@@ -27,12 +27,18 @@ class SimDispenser:
         self.saved_ticks = 0
         self.direction = p.MOTOR_DIRECTION_FORWARD
         self.motor_until = 0.0
-        self.over_current = False  # set True to simulate a stalled pump
-        self.led = "off"
+        self.over_current = False  # the firmware's current-sense flag: a stalled pump
+        self.jammed = False  # the sim page's "jam": the motor stalls as soon as it runs
+        self.led = "off"  # LED pattern: off / idle / dispense / done / clean / current_sense
         self.id_conflict = False
         self.packet_mode = False
         self.poured_ticks = 0
         self._rx = bytearray()
+        # the motor run in progress (or the last one), for the sim page's live tick count
+        self._run_start = 0.0
+        self._run_rate = 0.0  # ticks per second of real time
+        self._run_target = 0.0  # ticks (inf for timed runs)
+        self._ticks_before = 0.0  # ticks pumped by earlier runs
 
     @property
     def dispensing(self) -> bool:
@@ -70,14 +76,21 @@ class SimDispenser:
             return b"" if broadcast else bytes([p.ACK_CRC_FAIL])
         reply = None
         u16 = lambda n: int.from_bytes(body[2 + 2 * n:4 + 2 * n], "little")
+        cs = self.over_current  # like the firmware: a stalled pump ignores motor / LED commands
         if ptype == p.TICK_SPEED_DISPENSE:
-            self._run(u16(0), u16(1))
+            if not cs:
+                self._run(u16(0), u16(1))
         elif ptype == p.TICK_DISPENSE:
-            self._run(int.from_bytes(body[2:6], "little"), 255)
+            if not cs:
+                self._run(int.from_bytes(body[2:6], "little"), 255)
         elif ptype == p.TIME_DISPENSE:
-            self.motor_until = time.monotonic() + int.from_bytes(body[2:6], "little") / 1000
+            if not cs:
+                self._start(int.from_bytes(body[2:6], "little") / 1000, TICKS_PER_SECOND, float("inf"))
         elif ptype == p.SET_MOTOR_SPEED:
-            self.motor_until = time.monotonic() + (3600 if body[2] else 0)
+            if not body[2]:
+                self.motor_until = min(self.motor_until, time.monotonic())
+            elif not cs:
+                self._start(3600, TICKS_PER_SECOND * body[2] / 255, float("inf"))
         elif ptype == p.SET_MOTOR_DIRECTION:
             self.direction = body[2]
         elif ptype == p.IS_DISPENSING:
@@ -96,7 +109,8 @@ class SimDispenser:
             reply = p.body16(0, ptype, self.version, 0)
         elif ptype == p.ID_CONFLICT:
             self.id_conflict = True
-        elif ptype in (p.LED_OFF, p.LED_IDLE, p.LED_DISPENSE, p.LED_DRINK_DONE, p.LED_CLEAN):
+        elif ptype == p.LED_OFF or (ptype in (p.LED_IDLE, p.LED_DISPENSE, p.LED_DRINK_DONE, p.LED_CLEAN)
+                                    and not cs):
             self.led = {p.LED_OFF: "off", p.LED_IDLE: "idle", p.LED_DISPENSE: "dispense",
                         p.LED_DRINK_DONE: "done", p.LED_CLEAN: "clean"}[ptype]
         if broadcast:
@@ -108,9 +122,47 @@ class SimDispenser:
 
     def _run(self, ticks: int, speed: int) -> None:
         rate = TICKS_PER_SECOND * max(speed, 1) / 255
-        self.motor_until = time.monotonic() + ticks / rate / SimBus.time_scale
+        self._start(ticks / rate / SimBus.time_scale, rate * SimBus.time_scale, ticks)
         self.poured_ticks += ticks
         self.saved_ticks += ticks
+
+    def _start(self, seconds: float, rate: float, target: float) -> None:
+        now = time.monotonic()
+        self._ticks_before += self._run_ticks(now)
+        self._run_start, self._run_rate, self._run_target = now, rate, target
+        self.motor_until = now + seconds
+        if self.jammed:
+            self.stall()
+
+    def _run_ticks(self, now: float) -> float:
+        elapsed = max(0.0, min(now, self.motor_until) - self._run_start)
+        return min(self._run_target, elapsed * self._run_rate)
+
+    def stall(self) -> None:
+        """What the firmware does when the current sense trips: stop, blink red, ignore commands
+        until the router resets it."""
+        self.motor_until = min(self.motor_until, time.monotonic())
+        self.over_current = True
+        self.led = "current_sense"
+
+    def boot(self) -> None:
+        """The router's reset line restarts the dispenser (clears a stall; a jam stays)."""
+        self.packet_mode = False
+        self.over_current = False
+        self.motor_until = min(self.motor_until, time.monotonic())
+        self.led = "off"
+
+    def snapshot(self) -> dict:
+        """State for the sim page."""
+        now = time.monotonic()
+        running = self.dispensing
+        return {"id": self.id, "led": self.led, "running": running,
+                "reverse": self.direction != p.MOTOR_DIRECTION_FORWARD,
+                "ticks": round(self._ticks_before + self._run_ticks(now), 1),
+                "run_ticks": round(self._run_ticks(now), 1),
+                "run_target": None if self._run_target == float("inf") else self._run_target,
+                "level": self.level, "low": self.low_threshold, "out": self.out_threshold,
+                "stalled": self.over_current, "jammed": self.jammed, "id_conflict": self.id_conflict}
 
 
 class SimBus:
@@ -179,7 +231,7 @@ class _SimRouter:
     def reset(self) -> None:
         self.bus.selected = None
         for d in self.bus.ports.values():
-            d.packet_mode = False
+            d.boot()
 
     def select(self, port: int) -> None:
         self.bus.selected = port

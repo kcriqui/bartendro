@@ -18,7 +18,7 @@ from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +49,7 @@ from ..db.menu import (
     uses,
 )
 from ..db.models import Dispenser, Drink, Ingredient, Kind, Party, PartyDrink, PourLog, RecipeItem, utcnow
+from ..hw.driver import TICKS_PER_ML
 from .theme import DEFAULTS as THEME_DEFAULTS
 from .theme import theme_css
 from .theme import valid as valid_color
@@ -64,6 +65,8 @@ ESSENTIALS = 4     # drinks in "the essentials": two rows of two
 ROBOTS = {"": "Bartendro party robot", "bar2d2": "Bar2D2 (astromech dome on a Dalek)"}  # Party.robot
 MARQUEE_MAX = 200
 MENU_CACHE_SECONDS = 60  # also catch changes made by another process (bartendro-db)
+SIM_COLUMNS = 3  # the sim page lays the pumps out 3 wide (Kevin's bots: 3 x 5)
+SIM_PUSH_SECONDS = 0.1  # the sim page's update rate (only sent when something changed)
 
 
 def guest_event(event: dict) -> dict:
@@ -123,6 +126,10 @@ class RunRequest(BaseModel):
     reverse: bool = False
 
 
+class SimLevelRequest(BaseModel):
+    level: int = Field(ge=0, le=1023)  # the liquid level sensor's reading
+
+
 class CleanRequest(BaseModel):
     which: str = "all"
 
@@ -151,15 +158,18 @@ class PreviewRequest(BaseModel):
 
 def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = None,
                banner: str = "", allow_uploads: bool = True, reload_templates: bool = False,
-               access_log: Path | None = None) -> FastAPI:
+               access_log: Path | None = None, sim_controls: bool = True) -> FastAPI:
     """`uploads`: folder for party logos (default: "uploads" next to the database).
     `banner`: a line shown on every page (the hosted demo bot: "simulated pumps").
     `allow_uploads=False`: no logo uploads (a copy that's open to the internet).
     `reload_templates`: pick up template edits without a restart (development; otherwise every
     request checks every template file for changes - slow, especially on a network share).
     `access_log`: write one JSON line per request / WebSocket to this file (the hosted demo:
-    scripts/check_demo_log.py reads it to spot trouble). Rotated at 5 MB, 5 old files kept."""
+    scripts/check_demo_log.py reads it to spot trouble). Rotated at 5 MB, 5 old files kept.
+    `sim_controls=False`: the /sim page (simulated pumps only) can watch but not jam pumps or
+    change levels (the public demo, where visitors share one bot)."""
     sessions = bot.sessions
+    sim = getattr(bot.driver, "sim", None)  # the SimBus when the pumps are simulated
     if uploads is None:
         db_file = sessions.kw["bind"].url.database
         uploads = Path(db_file).resolve().parent / "uploads"
@@ -222,7 +232,7 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
             response = templates.TemplateResponse(request, name, {
                 "bot_name": bot_name, "status": guest_event(bot.status()), "opts": opts, "amount": amount,
                 "version": __version__, "nav": nav, "party": party, "theme_css": theme_css(party),
-                "banner": banner, "allow_uploads": allow_uploads, **ctx})
+                "banner": banner, "allow_uploads": allow_uploads, "sim": sim is not None, **ctx})
         preview = request.query_params.get("party")
         if preview is not None and preview.isdigit():
             if int(preview):
@@ -827,6 +837,74 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
     def api_reset():
         bot.reset()
         return bot.status()
+
+    # ------------------------------------------------------------------ simulator page
+
+    sim_names: dict = {"gen": None}
+
+    def sim_state() -> dict:
+        """Every simulated dispenser, in pump order, plus what's loaded in it."""
+        if sim_names["gen"] != generation():
+            with sessions() as s:
+                sim_names["pumps"] = {d.number: (d.ingredient.name if d.ingredient else "", d.ticks_per_ml)
+                                      for d in s.scalars(select(Dispenser))}
+            sim_names["gen"] = generation()
+        pumps = []
+        for i, d in enumerate(bot.driver.dispensers):
+            name, tpm = sim_names["pumps"].get(i + 1, ("", None))
+            pumps.append({"number": i + 1, "bottle": name, "ticks_per_ml": tpm or TICKS_PER_ML,
+                          **sim.ports[d.port].snapshot()})
+        return {"status": guest_event(bot.status()), "pumps": pumps}
+
+    def sim_pump(number: int):
+        if sim is None:
+            raise HTTPException(404)
+        if not sim_controls:
+            raise HTTPException(403, "the simulator controls are switched off here")
+        if not 1 <= number <= bot.dispenser_count:
+            raise HTTPException(404, f"no dispenser #{number}")
+        return sim.ports[bot.driver.dispensers[number - 1].port]
+
+    @app.get("/sim")
+    def sim_page(request: Request):
+        if sim is None:
+            raise HTTPException(404, "not simulating: this bot has real pumps")
+        return templates.TemplateResponse(request, "sim.html", {
+            "bot_name": bot_name, "controls": sim_controls, "columns": SIM_COLUMNS})
+
+    @app.post("/api/sim/{number}/jam")
+    def sim_jam(number: int):
+        """Toggle a jam: the pump stalls (current sense) now if it's running, else when it next runs."""
+        d = sim_pump(number)
+        d.jammed = not d.jammed
+        if d.jammed and d.dispensing:
+            d.stall()
+        return {"jammed": d.jammed}
+
+    @app.post("/api/sim/{number}/level")
+    def sim_level(number: int, req: SimLevelRequest):
+        d = sim_pump(number)
+        d.level = req.level
+        return {"level": d.level}
+
+    @app.websocket("/ws/sim")
+    async def ws_sim(websocket: WebSocket):
+        if sim is None:
+            await websocket.close(code=1008)
+            return
+        await websocket.accept()
+        if record is not None:
+            record(websocket.client.host if websocket.client else "", "WS", websocket, 101, time.monotonic())
+        last = None
+        try:
+            while True:
+                state = sim_state()
+                if state != last:
+                    await websocket.send_json(state)
+                    last = state
+                await asyncio.sleep(SIM_PUSH_SECONDS)
+        except (WebSocketDisconnect, RuntimeError):
+            pass  # closed by the browser
 
     @app.websocket("/ws")
     async def ws(websocket: WebSocket):

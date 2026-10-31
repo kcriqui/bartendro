@@ -112,3 +112,11 @@ like the 15-port router (same I2C address and commands), so everything above app
   v3+. If `status-led green` shows blue, note the firmware version from `discover`.
 - `pour 1 60` into a measuring cup: the old calibration is 2.78 ticks/ml.
 - `level` gives values above 120 for full bottles (low <= 120, out <= 75).
+- **Reset after a stall** (2026-10-31): Reset now restarts the dispensers through the router and
+  finds them again, like the old app. Before that fix our Reset only sent `led_idle`, which a
+  stalled dispenser ignores (the firmware ignores motor and LED commands until it restarts), so
+  the pump would have stayed dead. Check: block a tube (or hold the rotor) during a test pour,
+  see the dispenser blink red and the screen ask for a reset, press Reset, pour again.
+- A stall is noticed when the pour loop gets to that pump: it checks the pumps one at a time
+  (as the old code did), so a stall on a later pump shows up only after the earlier pumps finish.
+  The stalled pump stops itself at once either way.
