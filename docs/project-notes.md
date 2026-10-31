@@ -1,7 +1,10 @@
 # Project notes
 
 Decisions and findings that aren't obvious from the code. Kept here (on the NAS, in the repo)
-so they're the same from every PC. Plans live in [plans/](plans/).
+so they're the same from every PC. Plans live in [plans/](plans/); status and backlog in
+[status.md](status.md); code map in [architecture.md](architecture.md); recipe rules in
+[recipes.md](recipes.md); workflow in [development.md](development.md); the demo in
+[hosting.md](hosting.md).
 
 ## Touchscreen for the 15-pump bots (2026-10-01)
 
@@ -79,8 +82,10 @@ login-free).
 - New code reaches it only when the app is edited/redeployed in TrueNAS (`pull_policy: build`).
 - The first build failed with a transient "SSL connection timeout" fetching from GitHub; a retry
   worked. If it recurs, publish a prebuilt image (GHCR) instead of building on the NAS.
-- NAS access from the PC is the TrueNAS web UI (Kevin's Chrome); no SSH. App logs need root:
-  Kevin runs `sudo tail -n 40 /var/log/app_lifecycle.log`. Funnel / ACL changes are Kevin's to make.
+- NAS access: originally only the TrueNAS web UI (Kevin's Chrome; app logs needed Kevin to run
+  `sudo tail -n 40 /var/log/app_lifecycle.log`). Since late October there's **root SSH and the
+  REST API** (Kevin's global CLAUDE.md; [development.md](development.md#nas-access)). Tailnet ACL /
+  Funnel policy changes are still Kevin's call.
 - The static GitHub Pages demo was removed on 2026-10-02 (gh-pages deleted). GitHub's API refused
   to switch Pages off for this fork; with no branch it serves nothing.
 
@@ -144,6 +149,19 @@ font pixel on the 16-row board (`static/led-font.js`). Kevin picked it from a si
 8x13, 9x15 (regular + bold) and Helvetica 12 (scratch: build/fonts/compare.html, bdf2json.py). Tried
 before and rejected: canvas text (strokes too thick), the Adafruit GFX 5x7 (boring), 5x7 doubled with
 Scale2x (too smoothed). Pixel Operator (CC0, 16 px) wasn't reachable to try.
+
+## Code review and the public repo (2026-10-03)
+
+Kevin's friend Chris (christopherheiny@gmail.com) offered to review the code.
+[PR #1](https://github.com/kcriqui/bartendro/pull/1): `modernize` -> `master` inside the fork
+(not upstream), a review PR - not for merging yet - with a reading guide (hardware protocol, driver,
+bot state machine, migrations first; recipes / art / `ui/` skippable). Kevin emailed him the link
+himself. No comments yet as of 2026-10-24. Before Chris reviews, `ruff` / `pytest-cov` / `vulture`
+were added and their findings fixed (779946a).
+
+The fork is **public**: anyone can read the code, the notes (demo URL, NAS / tailnet names) and the
+bot database. Kevin hasn't asked to change that; a private copy would need a GitHub token on TrueNAS
+for the demo build.
 
 ## Pi model and performance (2026-10-02)
 

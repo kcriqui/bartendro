@@ -43,6 +43,9 @@ Share that URL. Stop sharing: `tailscale funnel --https=443 off` (or `tailscale 
 Funnel hostnames appear in public certificate logs, so expect the odd crawler, not just the
 people you send the link to. Restart the app to undo whatever visitors changed.
 
+On Kevin's NAS: Funnel 443 -> `http://127.0.0.1:8077` (the demo). Check with
+`docker exec ix-tailscale-tailscale-1 tailscale funnel status` over SSH.
+
 ## Who has been using it
 
 TrueNAS: Apps > bartendro-demo > Workloads > bartendro > View Logs, set Tail Lines to 20000,
@@ -51,6 +54,8 @@ console (F12 > Console) on that page: one row per IP with first/last visit in Pa
 counts, and person / scanner / bot / your LAN / your tailnet / Google. The log only goes back to the
 last redeploy. Visitors' real IPs show (Funnel passes them on). Scanners show up within hours of
 any Funnel URL going live (certificate transparency logs) - they only ever get 404s.
+Easier now: the demo's own access log on the NAS (next section) covers everything since 2026-10-03
+and survives redeploys; `py scripts/check_demo_log.py --all --dry-run` summarises it.
 
 ## Watching for trouble
 
@@ -64,7 +69,27 @@ probe that got something other than a 404, server errors, changes (POSTs) from o
 tailnet, request floods, or a log that stopped; scanners that only get 404s are just counted.
 `--all` checks the whole log, `--dry-run` doesn't remember the run.
 
+Crawlers are named by their user agent with request / admin-page counts (they aren't alerted);
+scanners show probes / total requests.
+
 A scheduled Claude task, **bartendro-demo-watch** (Claude app > Scheduled, 8 am and 8 pm), runs it and
 sends a desktop notification on ALERT. It runs only while the Claude app is open on Kevin's home PC
-(missed runs happen at the next launch).
+(missed runs happen at the next launch). The notification tool skips the pop-up when Kevin is
+active in the app (seen 2026-10-21), so an alert can exist only in the task's run session - check
+the task's recent runs (Scheduled > bartendro-demo-watch) when asked about the logs.
+
+## What the logs have shown (2026-10-03 to 10-24)
+
+- Visitors: Kevin's devices (LAN 172.16.x, tailnet 100.64-127.x), a few colleagues, one browser tab
+  (99.35.16.75) left open and reconnecting for weeks. Nobody outside changed anything.
+- **ClaudeBot crawled 158 admin pages** (Oct 3-6), plus Reflectionbot, Facebot, OAI-SearchBot. Read
+  only - every change needs a POST - but crawled admin pages could be indexed. Fixed with
+  `/robots.txt` (disallow all) + `noindex` on every page (2026-10-06); the crawlers stopped.
+- Scanners: a handful a day, all 404 / 405 - `.env`, `.git`, WordPress / PHP, and AI-proxy configs
+  (`litellm/config.yaml`, `claude/config.json`...). One burst on Oct 21 (34.65.55.32, 277 requests
+  in a minute, mostly `.env` variants) raised the only alert so far.
+- **PHP "php2shell" (CVE-2026-109618 / 109619, disclosed 2026-10-21)**: doesn't affect us - checked
+  over SSH: no PHP in any container on the NAS or on the host. The PHP probes that day were bots
+  sweeping for it.
+- No password needed so far (Kevin: only if scanners pile up).
 
