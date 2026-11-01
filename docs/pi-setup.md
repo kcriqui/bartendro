@@ -117,6 +117,22 @@ like the 15-port router (same I2C address and commands), so everything above app
   stalled dispenser ignores (the firmware ignores motor and LED commands until it restarts), so
   the pump would have stayed dead. Check: block a tube (or hold the rotor) during a test pour,
   see the dispenser blink red and the screen ask for a reset, press Reset, pour again.
-- A stall is noticed when the pour loop gets to that pump: it checks the pumps one at a time
-  (as the old code did), so a stall on a later pump shows up only after the earlier pumps finish.
-  The stalled pump stops itself at once either way.
+- A stall shows up within one polling round (~0.1 s plus a few ms per running pump): since
+  pulsed pours (2026-10-31) the pour loop checks every running pump each round. The old code
+  waited for one pump at a time, so a stall on a later pump showed only after the earlier ones.
+- **Pump speed for pulsed pours** (option "pump ticks per second", default 40 = a guess): run one
+  pump at full speed for a timed 10 s (`bartendro-hw ... run`), weigh it, and convert:
+  ticks per second = ml / 10 x the pump's ticks per ml. If it's far off, pulsed bursts bunch up at
+  the start (rate set too high) or drift late. Then pour a layered-looking drink (juice + spirit)
+  into a clear glass with pour mixing = off, together and pulsed, and taste the top. Also check
+  that half speed (166) really is about 166/255 of full speed - the schedule assumes it is.
+- Pulsed pours stop and start the motors several times per drink: listen for stutter, check the
+  totals still match a scale (each burst is whole ticks; the last burst takes the remainder).
+- **Sim page on the Pi's own screen** (needs `bartendro-web --sim 15` on the Pi, no pumps): open
+  `/sim` in a second Chromium window on the Pi next to the kiosk menu (ideally a party with the LED
+  sign on) and check the menu still scrolls and responds smoothly, and `top` shows how much CPU
+  Chromium and `bartendro-web` take with and without the sim window. The sim page redraws 15
+  glowing LED rings up to 60 times a second, even when idle; the glow (CSS drop-shadow) is the
+  likely cost. Watching it from a phone or PC costs the Pi almost nothing (the server sends ~10
+  small updates a second). If it's sluggish: add a light mode (no glow, ~20 fps, no redraw when
+  nothing changed) to `static/sim.js`.

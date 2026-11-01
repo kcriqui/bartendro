@@ -19,7 +19,7 @@ If git complains about "dubious ownership" on the share:
 
 ## Tests and code quality
 
-- `pytest` (no hardware needed; 113 tests). `bartendro-hw --sim N ...` for the hardware CLI.
+- `pytest` (no hardware needed; 124 tests). `bartendro-hw --sim N ...` for the hardware CLI.
 - **Before committing, run pytest and stop if anything fails.** A `| tail` pipe hides the exit code -
   that once let a failing commit through.
 - Lint: `py -m ruff check src tests scripts` (config in pyproject; must stay clean). `ruff format`

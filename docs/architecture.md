@@ -11,7 +11,13 @@ comment (e.g. "discovery retries are now bounded").
 - `router.py` - smbus2, I2C bus 1, address 4. `status_led.py` - gpiozero, BCM 24/23/25 = board pins
   18/16/22.
 - `driver.py` - port of `ui/bartendro/router/driver.py` plus the pour loop of
-  `mixer._dispense_recipe` (amounts under 20 ml go at half speed). Some firmware commands are ported
+  `mixer._dispense_recipe` (amounts under 20 ml go at half speed). **Pour mixing** (2026-10-31,
+  new): `pour_schedule()` plans when each pump runs - "pulsed" (default) splits the shorter pours
+  into up to N bursts (option `pour_pulses`, 6) spread over the longest pour, "together" starts
+  them late so all finish at once, "off" = the old app (all start at once, so the smallest pours
+  finish first and the top of the glass is the longest pour - usually the booze). Timed with
+  option `pump_ticks_per_second` (40 until measured). A pump's next burst waits for its last
+  one: the firmware ignores (but ACKs) a dispense while its motor runs. Some firmware commands are ported
   but unused (comm_test, LED patterns, flush_saved_tick_count, set_liquid_level_thresholds) - keep.
 - `simulator.py` - fake router + dispensers speaking the real protocol. `connect.py` - open the
   hardware or the simulator.
@@ -117,5 +123,7 @@ Edit `models.py`, then `bartendro-db --db scratch.db revision -m "..."`, review 
 (test_upgrade_keeps_data, test_dbcli). `test_migrations_match_models` fails until the migration
 exists; `test_upgrade_keeps_data` checks a populated db survives. Migrations run with foreign keys
 off in one transaction (`db/migrations/env.py`) - batch mode drops and recreates tables, which
-otherwise breaks or cascade-deletes referencing rows. Enum columns store values
+otherwise breaks or cascade-deletes referencing rows. New options need no migration (missing keys
+read as their default, `db/options.py`); options with a fixed list of values go in `CHOICES`
+(shown as a drop-down on Admin > Options). Enum columns store values
 (`values_callable`); keep `str` + `Enum` (not `StrEnum`: `str()` of the members differs).

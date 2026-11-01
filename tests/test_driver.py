@@ -1,7 +1,7 @@
 import pytest
 
 from bartendro.cli import main
-from bartendro.hw.driver import TICKS_PER_ML, Driver, DriverError, OverCurrentError
+from bartendro.hw.driver import TICKS_PER_ML, Driver, DriverError, OverCurrentError, pour_schedule
 from bartendro.hw.simulator import SimBus, SimDispenser
 
 
@@ -126,3 +126,63 @@ def test_cli_simulated(capsys):
     assert main(["--sim", "3", "level"]) == 0
     assert main(["--sim", "3", "info", "1"]) == 0
     assert main(["--sim", "3", "--ports", "3", "discover"]) == 0
+
+
+# ------------------------------------------------------------------ mixing (pour_schedule)
+
+def test_schedule_off_starts_everything_at_once():
+    plan = pour_schedule({0: (250, 255), 1: (83, 255)}, "off")
+    assert plan == [(0.0, 0, 250, 255), (0.0, 1, 83, 255)]
+
+
+def test_schedule_together_ends_together():
+    plan = pour_schedule({0: (200, 255), 1: (80, 255)}, "together", ticks_per_second=40)
+    assert plan == [(0.0, 0, 200, 255), (3.0, 1, 80, 255)]  # 5 s and 2 s: the short one starts at 3 s
+
+
+def test_schedule_pulsed_spreads_the_shorter_pours():
+    plan = pour_schedule({0: (240, 255), 1: (83, 255), 2: (230, 255), 3: (10, 255)}, "pulsed",
+                         pulses=6, ticks_per_second=40)
+    by_pump = {i: [(at, t) for at, j, t, _ in plan if j == i] for i in range(4)}
+    assert by_pump[0] == [(0.0, 240)]  # the longest runs in one go
+    assert by_pump[2] == [(0.0, 230)]  # nearly as long: pulsing would gain nothing
+    assert [at for at, _ in by_pump[1]] == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]  # one per sixth of 6 s
+    assert [t for _, t in by_pump[1]] == [13, 13, 13, 13, 13, 18]  # the last burst takes the rest
+    assert by_pump[3] == [(0.0, 10)]  # too small to split (bursts of at least MIN_PULSE_TICKS)
+    assert plan == sorted(plan)
+
+
+def test_schedule_half_speed_takes_longer():
+    # a slow pour (half speed) can be the longest even with fewer ticks
+    plan = pour_schedule({0: (100, 255), 1: (90, 85)}, "together", ticks_per_second=40)
+    assert plan[0][1] == 1 and plan[1][1] == 0 and plan[1][0] > 0
+
+
+def test_schedule_rejects_unknown_mode():
+    with pytest.raises(DriverError, match="mixing"):
+        pour_schedule({0: (10, 255)}, "stirred")
+
+
+@pytest.mark.parametrize("mixing", ["off", "together", "pulsed"])
+def test_pour_mixing_pours_exact_totals(mixing):
+    bus = SimBus.with_dispensers(3)
+    d = make(bus)
+    sent = []
+    real = d.dispense_ticks
+    d.dispense_ticks = lambda i, ticks, speed=255: sent.append((i, ticks)) or real(i, ticks, speed)
+    d.pour_ml({0: 90, 1: 30, 2: 45}, mixing=mixing)
+    for i, ml in ((0, 90), (1, 30), (2, 45)):
+        assert sum(t for j, t in sent if j == i) == int(ml * TICKS_PER_ML) == bus.ports[i].poured_ticks
+    bursts = sum(1 for j, _ in sent if j == 1)
+    assert bursts == (6 if mixing == "pulsed" else 1)
+    assert not any(x.dispensing for x in bus.ports.values())
+
+
+def test_sim_ignores_dispense_while_running(monkeypatch):
+    monkeypatch.setattr(SimBus, "time_scale", 1.0)
+    bus = SimBus.with_dispensers(1)
+    d = make(bus)
+    assert d.dispense_ticks(0, 400)  # 10 s at full speed
+    assert d.dispense_ticks(0, 40)  # ACKed, but the firmware ignores it while running
+    assert bus.ports[0].poured_ticks == 400
+    d.stop(0)

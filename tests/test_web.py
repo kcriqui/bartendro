@@ -480,3 +480,13 @@ def test_robots_txt(env):
     r = client.get("/robots.txt")
     assert r.status_code == 200 and r.text == "User-agent: *\nDisallow: /\n"
     assert '<meta name="robots" content="noindex, nofollow">' in client.get("/").text
+
+
+def test_pour_mixing_option(env):
+    client, _b, _, sessions = env
+    page = client.get("/admin/options").text
+    assert '<select name="pour_mixing">' in page and "<option selected>pulsed</option>" in page
+    client.post("/admin/options", data={"pour_mixing": "together", "pour_pulses": "4"})
+    client.post("/admin/options", data={"pour_mixing": "shaken"})  # not a choice: kept as it was
+    with sessions() as s:
+        assert options.get(s, "pour_mixing") == "together"

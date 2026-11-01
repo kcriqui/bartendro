@@ -32,7 +32,7 @@ Kevin won't go beyond a Pi 4** (2026-10-23). Raspberry Pi OS Bookworm, Python 3.
 
 ## Current state (2026-10-31)
 
-- `modernize` pushed (latest: `db0af91`, 2026-10-23, plus this notes reorganisation): 113 tests
+- `modernize` pushed (2026-10-31): 124 tests
   pass, ruff clean, migrations 0001-0007. Everything runs only against the simulator so far.
 - **Review:** [PR #1](https://github.com/kcriqui/bartendro/pull/1) (`modernize` -> `master` in the
   fork) opened 2026-10-03 for Kevin's friend Chris (christopherheiny@gmail.com) to review. No
@@ -44,6 +44,10 @@ Kevin won't go beyond a Pi 4** (2026-10-23). Raspberry Pi OS Bookworm, Python 3.
   Next idea: per-pump LEDs (only the pumps in the drink show "pouring", each turns green when
   done; party colours later) - the firmware already allows it, see
   [project-notes.md](project-notes.md#dispenser-leds-2026-10-31).
+- **Pour mixing** (2026-10-31, Kevin: "the top is super strong"): drinks now pour the shorter
+  ingredients in bursts spread over the longest one (Admin > Options > pour mixing: pulsed /
+  together / off). Timing needs the real pump speed - see
+  [pi-setup.md](pi-setup.md#what-to-check-on-real-hardware). Covers David's "pulse the pumps" item.
 - **Hosted demo** live at https://truenas-scale.tail4c32e5.ts.net, watched twice a day
   ([hosting.md](hosting.md)).
 - **Bot database** (build/bartendro.db, copy in deploy/demo-bot.db): 200 drinks, "Tequila, Anejo"

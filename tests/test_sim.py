@@ -109,3 +109,19 @@ def test_level(tmp_path):
         assert bus.ports[1].level == 50
         assert client.post("/api/sim/2/level", json={"level": -1}).status_code == 422
         assert client.post("/api/sim/16/level", json={"level": 50}).status_code == 404
+
+
+def test_pour_progress(tmp_path):
+    client, b, _bus, sessions = make(tmp_path)
+    with sessions() as s:
+        drink_id = s.scalar(select(Drink.id).where(Drink.name == "Black Russian"))
+    with client:
+        client.post(f"/api/drink/{drink_id}/make", json={})
+        wait_idle(b)
+        with client.websocket_connect("/ws/sim") as ws:
+            pumps = ws.receive_json()["pumps"]
+    poured = [p for p in pumps if p["pour_ml"] is not None]
+    assert len(poured) == 2  # vodka and coffee liqueur
+    for p in poured:  # each pump's whole pour, however many bursts it took
+        assert p["pour_ticks"] == int(p["pour_ml"] * p["ticks_per_ml"])
+    assert all(p["pour_ticks"] is None for p in pumps if p["pour_ml"] is None)

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ bot_name }} - simulated pumps</title>
 <link rel="icon" href="/static/img/icon.ico">
-<link rel="stylesheet" href="/static/sim.css">
+<link rel="stylesheet" href="/static/sim.css?v={{ v }}">
 </head>
 <body>
 <header>
@@ -29,6 +29,6 @@
     the liquid level sensor's reading (only used when the "use liquid level sensors" option is on).</p>
   {% endif %}
 </footer>
-<script src="/static/sim.js"></script>
+<script src="/static/sim.js?v={{ v }}"></script>
 </body>
 </html>

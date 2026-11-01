@@ -566,7 +566,8 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
     @app.get("/admin/options")
     def admin_options(request: Request):
         return page(request, "admin/options.html",
-                    fields=[(k, v) for k, v in options.DEFAULTS.items() if k != "login_password_hash"])
+                    fields=[(k, v) for k, v in options.DEFAULTS.items() if k != "login_password_hash"],
+                    choices=options.CHOICES)
 
     @app.post("/admin/options")
     async def save_options(request: Request):
@@ -841,6 +842,21 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
     # ------------------------------------------------------------------ simulator page
 
     sim_names: dict = {"gen": None}
+    sim_pour: dict = {"ml": {}, "base": {}}  # the last pour stage: {number: ml}, ticks before it
+
+    def sim_pour_started(event: dict) -> None:
+        """Called by the bot just before it pumps a stage, so the page can show each pump's
+        progress through the whole pour (pulsed pours run a pump in several bursts)."""
+        plan = bot.current
+        if event.get("type") != "pouring" or plan is None:
+            return
+        stage = plan.pre_pumps if event.get("stage") == 1 else plan.pumps
+        sim_pour["base"] = {i + 1: sim.ports[d.port].snapshot()["ticks"]
+                            for i, d in enumerate(bot.driver.dispensers)}
+        sim_pour["ml"] = dict(stage)
+
+    if sim is not None:
+        bot.subscribe(sim_pour_started)
 
     def sim_state() -> dict:
         """Every simulated dispenser, in pump order, plus what's loaded in it."""
@@ -852,8 +868,11 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
         pumps = []
         for i, d in enumerate(bot.driver.dispensers):
             name, tpm = sim_names["pumps"].get(i + 1, ("", None))
-            pumps.append({"number": i + 1, "bottle": name, "ticks_per_ml": tpm or TICKS_PER_ML,
-                          **sim.ports[d.port].snapshot()})
+            snap = sim.ports[d.port].snapshot()
+            pour_ml = sim_pour["ml"].get(i + 1)
+            pumps.append({"number": i + 1, "bottle": name, "ticks_per_ml": tpm or TICKS_PER_ML, **snap,
+                          "pour_ml": pour_ml, "pour_ticks": None if pour_ml is None else
+                          round(snap["ticks"] - sim_pour["base"].get(i + 1, 0), 1)})
         return {"status": guest_event(bot.status()), "pumps": pumps}
 
     def sim_pump(number: int):
@@ -869,8 +888,9 @@ def create_app(bot: Bot, bot_name: str = "Bartendro", uploads: Path | None = Non
     def sim_page(request: Request):
         if sim is None:
             raise HTTPException(404, "not simulating: this bot has real pumps")
-        return templates.TemplateResponse(request, "sim.html", {
-            "bot_name": bot_name, "controls": sim_controls, "columns": SIM_COLUMNS})
+        v = max(int((HERE / "static" / f).stat().st_mtime) for f in ("sim.js", "sim.css"))
+        return templates.TemplateResponse(request, "sim.html", {  # ?v=: no stale cached copy
+            "bot_name": bot_name, "controls": sim_controls, "columns": SIM_COLUMNS, "v": v})
 
     @app.post("/api/sim/{number}/jam")
     def sim_jam(number: int):

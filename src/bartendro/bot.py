@@ -360,8 +360,11 @@ class Bot:
         with self.sessions() as s:
             cal = {n - 1: d.ticks_per_ml for n in pumps
                    if (d := s.get(Dispenser, n)) is not None and d.ticks_per_ml}
+            mixing = {"mixing": options.get(s, "pour_mixing"), "pulses": options.get(s, "pour_pulses"),
+                      "ticks_per_second": options.get(s, "pump_ticks_per_second")}
         t0 = time.monotonic()
-        self.driver.pour_ml({n - 1: ml for n, ml in pumps.items()}, always_fast=fast, ticks_per_ml=cal)
+        self.driver.pour_ml({n - 1: ml for n, ml in pumps.items()}, always_fast=fast, ticks_per_ml=cal,
+                            **mixing)
         log.info("poured %s: %s in %.1f s", plan.name,
                  ", ".join(f"#{n} {ml:.1f} ml" for n, ml in sorted(pumps.items())),
                  time.monotonic() - t0)

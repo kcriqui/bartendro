@@ -51,6 +51,7 @@ Accented names (Jägermeister, Piña Colada, Strawberry Purée) are fine UTF-8 i
 
 ## Small pours
 
-Brainstorm only (2026-10-02, also in [plans/](plans/2026-10-02-pump-or-hand-categories-parties.md)):
+Pour mixing (pulsed bursts, 2026-10-31) is done - see architecture.md (driver). Still brainstorm
+only (2026-10-02, also in [plans/](plans/2026-10-02-pump-or-hand-categories-parties.md)):
 independent size and strength-in-standard-drinks controls, sub-linear mixer scaling, a minimum pour
 floor, per-pump calibration offset (ticks = a*ml + b). Needs real pumps and a scale to tune.

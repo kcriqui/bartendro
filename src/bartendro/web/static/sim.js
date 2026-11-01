@@ -115,7 +115,11 @@
     q.bottle.classList.toggle("empty", !p.bottle);
     c.el.classList.toggle("running", p.running);
     c.el.classList.toggle("stalled", p.stalled);
-    if (p.run_target) {
+    if (p.pour_ml != null) {  // in the last pour: progress through all of it (pulsed = several bursts)
+      const done = p.pour_ticks / p.ticks_per_ml;
+      q.run.innerHTML = `pour <b>${done.toFixed(1)}</b> / ${p.pour_ml.toFixed(1)} ml`;
+      q.runBar.firstChild.style.width = Math.min(100, 100 * done / p.pour_ml) + "%";
+    } else if (p.run_target) {
       q.run.innerHTML = `run <b>${ml(p.run_ticks, p.ticks_per_ml)}</b> / ${ml(p.run_target, p.ticks_per_ml)} ml`;
       q.runBar.firstChild.style.width = Math.min(100, 100 * p.run_ticks / p.run_target) + "%";
     } else {

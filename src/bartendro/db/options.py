@@ -29,7 +29,15 @@ DEFAULTS: dict[str, bool | int | str] = {
     "use_shotbot_ui": False,
     "show_feeling_lucky": False,
     "turbo_mode": False,
+    # New: how a drink's pumps share the pour (hw.driver.pour_schedule). "pulsed": the shorter
+    # pours in bursts spread over the longest; "together": they start late and all end together;
+    # "off": all start at once (the old app - the top of the glass is the longest pour).
+    "pour_mixing": "pulsed",
+    "pour_pulses": 6,
+    "pump_ticks_per_second": 40,  # pump speed at full speed, for timing the above; measure it
 }
+
+CHOICES: dict[str, tuple[str, ...]] = {"pour_mixing": ("pulsed", "together", "off")}
 
 
 def parse(key: str, text: str) -> bool | int | str:
@@ -38,6 +46,8 @@ def parse(key: str, text: str) -> bool | int | str:
         return text.strip().lower() in ("1", "true", "yes", "on")
     if isinstance(default, int):
         return int(float(text))
+    if key in CHOICES and text not in CHOICES[key]:
+        raise ValueError(f"{key} must be one of {', '.join(CHOICES[key])}")
     return text
 
 

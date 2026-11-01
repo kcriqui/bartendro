@@ -77,11 +77,12 @@ class SimDispenser:
         reply = None
         u16 = lambda n: int.from_bytes(body[2 + 2 * n:4 + 2 * n], "little")
         cs = self.over_current  # like the firmware: a stalled pump ignores motor / LED commands
+        busy = cs or self.dispensing  # the firmware ignores (but ACKs) a dispense while running
         if ptype == p.TICK_SPEED_DISPENSE:
-            if not cs:
+            if not busy:
                 self._run(u16(0), u16(1))
         elif ptype == p.TICK_DISPENSE:
-            if not cs:
+            if not busy:
                 self._run(int.from_bytes(body[2:6], "little"), 255)
         elif ptype == p.TIME_DISPENSE:
             if not cs:
@@ -191,6 +192,11 @@ class _SimSerial:
     @property
     def timeout(self):
         return self.bus.timeout
+
+    @property
+    def time_scale(self) -> float:
+        """How much faster than real time the pumps run (the driver times pulsed pours by it)."""
+        return self.bus.time_scale
 
     @timeout.setter
     def timeout(self, v):

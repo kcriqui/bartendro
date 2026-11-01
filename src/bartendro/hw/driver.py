@@ -28,6 +28,13 @@ HALF_SPEED = 166
 SLOW_DISPENSE_THRESHOLD = 20  # ml: smaller amounts are poured at half speed
 MAX_DISPENSE_ML = 1000
 
+# Mixing (new): spreading the shorter pours over the longest one. See pour_schedule().
+MIXING = ("pulsed", "together", "off")
+DEFAULT_PULSES = 6
+DEFAULT_TICKS_PER_SECOND = 40  # pump speed at full speed: a guess until measured on a real bot
+MIN_PULSE_TICKS = 6  # ~2 ml: smaller bursts aren't worth a stop and start
+NEARLY_LONGEST = 0.9  # pours at least this long (vs the longest) run in one go
+
 DISCOVERY_RETRIES = 5  # the old code retried forever on garbled id replies
 
 
@@ -269,44 +276,70 @@ class Driver:
     # ------------------------------------------------------------- high level
 
     def pour_ml(self, amounts: dict[int, float], always_fast: bool = False, poll: float = 0.1,
-                timeout: float = 120.0, ticks_per_ml: dict[int, float] | None = None) -> None:
-        """Pour {dispenser index: ml} at the same time and wait until all pumps stop.
-        Same logic as mixer._dispense_recipe: amounts under 20 ml go at half speed.
-        `ticks_per_ml` overrides the calibration per dispenser index (default TICKS_PER_ML)."""
+                timeout: float = 120.0, ticks_per_ml: dict[int, float] | None = None,
+                mixing: str = "off", pulses: int = DEFAULT_PULSES,
+                ticks_per_second: float = DEFAULT_TICKS_PER_SECOND) -> None:
+        """Pour {dispenser index: ml} and wait until all pumps stop.
+        Speeds as in mixer._dispense_recipe: amounts under 20 ml go at half speed.
+        `ticks_per_ml` overrides the calibration per dispenser index (default TICKS_PER_ML).
+        `mixing` (new; the old app always started every pump at once, "off"): "together" starts
+        the shorter pours late so every pump finishes with the longest one; "pulsed" splits them
+        into up to `pulses` bursts spread over the longest one's run, so the glass fills in
+        proportion. Timing uses `ticks_per_second`, the pumps' speed at full speed."""
         for ml in amounts.values():
             if ml and not 0 < ml <= MAX_DISPENSE_ML:
                 raise DriverError(f"refusing to pour {ml} ml (limit {MAX_DISPENSE_ML})")
+        jobs = {}
+        for i, ml in amounts.items():
+            if ml:
+                speed = HALF_SPEED if ml < SLOW_DISPENSE_THRESHOLD and not always_fast else FULL_SPEED
+                jobs[i] = (int(ml * (ticks_per_ml or {}).get(i, TICKS_PER_ML)), speed)
+        pending = pour_schedule(jobs, mixing, pulses, ticks_per_second)
+        # The simulator runs its pumps faster in tests; follow its clock (1 on real hardware).
+        scale = getattr(self.ser, "time_scale", 1.0)
 
-        active: list[int] = []
+        active: list[int] = []  # every pump started, to stop them all if something goes wrong
+        running: set[int] = set()
         stalled = None
         try:
-            for i, ml in amounts.items():
-                if not ml:
-                    continue
-                ticks = int(ml * (ticks_per_ml or {}).get(i, TICKS_PER_ML))
-                speed = HALF_SPEED if ml < SLOW_DISPENSE_THRESHOLD and not always_fast else FULL_SPEED
-                active.append(i)  # before sending: the command may arrive even if its ACK is lost
-                self.set_motor_direction(i, p.MOTOR_DIRECTION_FORWARD)
-                if not self.dispense_ticks(i, ticks, speed):
-                    raise DriverError(f"dispense of {ticks} ticks at speed {speed} on dispenser #{i + 1} failed")
-                time.sleep(0.01)
-
-            deadline = time.monotonic() + timeout
-            for i in active:
-                while True:
-                    if time.monotonic() > deadline:
-                        raise DriverError("pour did not finish in time; pumps stopped")
+            start = time.monotonic()
+            deadline = start + timeout
+            while pending or running:
+                if time.monotonic() > deadline:
+                    raise DriverError("pour did not finish in time; pumps stopped")
+                now = (time.monotonic() - start) * scale
+                # Send the bursts that are due. A pump's next burst waits for its last one to
+                # finish: the firmware ignores (but ACKs) a dispense while the motor is running.
+                waiting: set[int] = set()
+                for burst in list(pending):
+                    at, i, ticks, speed = burst
+                    if i in running or i in waiting or at > now:
+                        waiting.add(i)
+                        continue
+                    pending.remove(burst)
+                    if i not in active:
+                        active.append(i)  # before sending: the command may arrive even if its ACK is lost
+                        self.set_motor_direction(i, p.MOTOR_DIRECTION_FORWARD)
+                    if not self.dispense_ticks(i, ticks, speed):
+                        raise DriverError(f"dispense of {ticks} ticks at speed {speed} on dispenser #{i + 1} failed")
+                    running.add(i)
+                    waiting.add(i)
+                    time.sleep(0.01)
+                # Changed from the old loop, which waited for one pump at a time: every running
+                # pump is checked each round, so a stall shows up at once.
+                for i in sorted(running):
                     dispensing, over_current = self.is_dispensing(i)
                     if dispensing < 0 or over_current < 0:
                         log.warning("is_dispensing on #%d failed (motor noise?), retrying", i + 1)
-                        time.sleep(0.2)
                         continue
                     if over_current:
                         stalled = i
                         raise OverCurrentError(f"pump #{i + 1} stalled (over current); other pumps stopped")
                     if dispensing == 0:
-                        break
-                    time.sleep(poll)
+                        running.discard(i)
+                if pending or running:
+                    due = min((at for at, *_ in pending), default=now + poll * scale)
+                    time.sleep(max(0.0, min(poll, (due - now) / scale)))
         except BaseException:
             # Changed from mixer._dispense_recipe, which left the other pumps running when one
             # stalled or a dispense command failed. Stop every pump we started; the stalled one
@@ -377,3 +410,29 @@ class Driver:
 
 def _u16(body: bytes, n: int) -> int:
     return int.from_bytes(body[2 + 2 * n: 4 + 2 * n], "little")
+
+
+def pour_schedule(jobs: dict[int, tuple[int, int]], mixing: str = "off", pulses: int = DEFAULT_PULSES,
+                  ticks_per_second: float = DEFAULT_TICKS_PER_SECOND) -> list[tuple[float, int, int, int]]:
+    """Plan a pour: {index: (ticks, speed)} -> [(start second, index, ticks, speed)] in start order.
+    "off": everything at once (the old app; the shortest pours finish first, so the top of the
+    glass is the longest pour - usually the strong part). "together": each pour starts late so it
+    ends with the longest. "pulsed": each shorter pour is split into up to `pulses` bursts of at
+    least MIN_PULSE_TICKS, one at the start of each equal slice of the longest pour's run."""
+    if mixing not in MIXING:
+        raise DriverError(f"mixing must be one of {', '.join(MIXING)}, not {mixing!r}")
+    rate = max(float(ticks_per_second), 1.0)
+    seconds = {i: ticks / (rate * speed / FULL_SPEED) for i, (ticks, speed) in jobs.items()}
+    longest = max(seconds.values(), default=0.0)
+    plan = []
+    for i, (ticks, speed) in jobs.items():
+        if mixing == "together":
+            plan.append((longest - seconds[i], i, ticks, speed))
+            continue
+        n = 1
+        if mixing == "pulsed" and seconds[i] < longest * NEARLY_LONGEST:
+            n = max(1, min(int(pulses), ticks // MIN_PULSE_TICKS))
+        each = ticks // n  # the last burst also takes the remainder
+        plan.extend((k * longest / n, i, each + (ticks - each * n if k == n - 1 else 0), speed)
+                    for k in range(n))
+    return sorted(plan)
