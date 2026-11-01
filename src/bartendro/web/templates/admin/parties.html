@@ -1,0 +1,30 @@
+{% extends "admin/layout.html" %}
+{% set tab = "parties" %}
+{% block title %}Parties - {{ bot_name }}{% endblock %}
+{% block admin %}
+<p class="hint">A party has its own look (title, colours, logo) and, if you pick drinks for it, its own
+  small menu. Only the active party is shown to guests; with none active you get the full menu and
+  the original Bartendro look.</p>
+<p><a class="btn primary" href="/admin/party/new">New party</a></p>
+{% if not parties %}<p class="empty">No parties yet.</p>{% endif %}
+<table class="grid">
+  {% for p in parties %}
+  <tr>
+    <td><a href="/admin/party/{{ p.id }}">{{ p.name }}</a>
+      {% if p.active %}<b class="level-ok">active</b>{% endif %}
+      <span class="muted">{{ p.drinks | length or "all" }} drinks</span></td>
+    <td class="pump-buttons">
+      <a class="btn small plain" href="/?party={{ p.id }}">Preview</a>
+      <form method="post" action="/admin/party/{{ p.id }}/{{ 'deactivate' if p.active else 'activate' }}" style="display:inline">
+        <button class="btn small {{ '' if p.active else 'primary' }}">{{ "Switch off" if p.active else "Make active" }}</button></form>
+      <form method="post" action="/admin/party/{{ p.id }}/duplicate" style="display:inline">
+        <button class="btn small plain">Duplicate</button></form>
+      <form method="post" action="/admin/party/{{ p.id }}/delete" style="display:inline">
+        <button class="btn small danger" data-confirm="Delete {{ p.name }}?">Delete</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="hint">Preview shows the guest pages as that party (for an hour, on this device);
+  <a href="/?party=0">stop previewing</a>.</p>
+{% endblock %}

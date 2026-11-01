@@ -1,0 +1,27 @@
+# Per-bot settings. Copy to /etc/bartendro/bartendro.toml (or ./bartendro.toml, or point
+# $BARTENDRO_CONFIG at it). Every setting is optional; the defaults are a 15-port Bartendro.
+
+name = "Bartendro 15"
+
+[hardware]
+ports = 15           # 15 = Bartendro router, 3 = mini-router
+dispensers = 15      # warn if discovery finds a different number (leave out to skip the check)
+# serial_device = "/dev/serial0"   # default: /dev/serial0, ttyAMA0, ttyS0
+# i2c_bus = 1
+# status_led = true
+# simulate = 0       # >0: no hardware, simulate this many dispensers
+
+[database]
+path = "/var/lib/bartendro/bartendro.db"   # relative paths are relative to this file
+
+[ui]
+screen = true        # touchscreen kiosk on this bot
+
+# A 3-pump bot on the mini-router, phone only:
+#
+# name = "Margaritabot"
+# [hardware]
+# ports = 3
+# dispensers = 3
+# [ui]
+# screen = false

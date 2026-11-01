@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ bot_name }} - simulated pumps</title>
+<link rel="icon" href="/static/img/icon.ico">
+<link rel="stylesheet" href="/static/sim.css?v={{ v }}">
+</head>
+<body>
+<header>
+  <h1>{{ bot_name }} <span>simulated pumps - for testing</span></h1>
+  <div id="state" class="state">connecting...</div>
+</header>
+<main id="pumps" class="pumps" style="--columns: {{ columns }}" data-controls="{{ 1 if controls else 0 }}"></main>
+<footer>
+  <p class="legend">
+    LEDs (the dispenser firmware's patterns):
+    <span><i style="background: linear-gradient(90deg, #f00, #0f0, #00f)"></i>idle</span>
+    <span><i style="background: linear-gradient(90deg, #f00, #00f)"></i>pouring</span>
+    <span><i style="background: linear-gradient(90deg, #0f0, #050)"></i>done</span>
+    <span><i style="background: linear-gradient(90deg, #960eeb, #ff8000)"></i>clean</span>
+    <span><i style="background: #f00"></i>stalled (blinks)</span>
+  </p>
+  {% if controls %}
+  <p><b>Jam</b> makes a pump stall the moment it runs (the firmware's current sense), like a
+    blocked tube; <b>Reset</b> on the bot's screen restarts the dispensers. The level buttons set
+    the liquid level sensor's reading (only used when the "use liquid level sensors" option is on).</p>
+  {% endif %}
+</footer>
+<script src="/static/sim.js?v={{ v }}"></script>
+</body>
+</html>

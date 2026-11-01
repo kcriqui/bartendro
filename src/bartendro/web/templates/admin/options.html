@@ -1,0 +1,26 @@
+{% extends "admin/layout.html" %}
+{% set tab = "options" %}
+{% block title %}Options - {{ bot_name }}{% endblock %}
+{% block admin %}
+<form method="post" action="/admin/options" class="form">
+  {% for key, default in fields %}
+    {% if key in choices %}
+    <label>{{ key | replace("_", " ") }} <select name="{{ key }}">
+      {% for c in choices[key] %}<option {% if opts[key] == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select></label>
+    {% elif default is sameas true or default is sameas false %}
+    <label class="check"><input type="checkbox" name="{{ key }}" {% if opts[key] %}checked{% endif %}> {{ key | replace("_", " ") }}</label>
+    {% else %}
+    <label>{{ key | replace("_", " ") }} <input name="{{ key }}" value="{{ opts[key] }}"
+           {% if default is number %}class="short" inputmode="numeric"{% endif %}></label>
+    {% endif %}
+  {% endfor %}
+  <p class="hint">Sizes are in ml. "metric" shows ml instead of fluid ounces.</p>
+  <p class="hint">Pour mixing: <b>pulsed</b> pours the shorter ingredients in bursts (up to "pour
+    pulses") spread over the longest one, so the glass fills in proportion; <b>together</b> starts
+    them late so every pump finishes at the same time; <b>off</b> starts all pumps at once (the
+    original Bartendro: the top of the drink is the longest pour). The timing uses "pump ticks per
+    second", the pumps' speed at full speed - measure it on the bot for the best spread.</p>
+  <button class="btn primary">Save</button>
+</form>
+{% endblock %}
